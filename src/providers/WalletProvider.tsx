@@ -13,7 +13,8 @@ import {
 import { clusterApiUrl } from "@solana/web3.js";
 import { useMemo } from "react";
 
-require("@solana/wallet-adapter-react-ui/styles.css");
+// Import the CSS using ES module import instead of require
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 interface WalletProviderProps {
   children: React.ReactNode;
