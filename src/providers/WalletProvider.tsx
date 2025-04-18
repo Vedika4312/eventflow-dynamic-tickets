@@ -8,7 +8,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
-  BackpackWalletAdapter,
+  LedgerWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 import { useMemo } from "react";
@@ -27,8 +27,7 @@ const WalletProvider = ({ children }: WalletProviderProps) => {
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
-      // Replaced BackpackWalletAdapter with a more standard adapter
-      new BackpackWalletAdapter(),
+      new LedgerWalletAdapter(),
     ],
     []
   );
