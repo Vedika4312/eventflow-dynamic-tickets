@@ -32,7 +32,7 @@ const Advantages = () => {
     {
       icon: <Clock className="h-8 w-8 mb-4 text-blocktix-purple" />,
       title: 'Instant Settlement',
-      description: 'Fast transactions and immediate ticket delivery with Solana's quick finality.'
+      description: 'Fast transactions and immediate ticket delivery with Solana\'s quick finality.'
     }
   ];
 
