@@ -9,13 +9,154 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      events: {
+        Row: {
+          category: string
+          created_at: string | null
+          currency: string
+          date: string
+          description: string
+          id: string
+          image_url: string | null
+          location: string
+          mint_address: string | null
+          organizer_wallet: string
+          price: number
+          sold_tickets: number
+          title: string
+          total_tickets: number
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          currency?: string
+          date: string
+          description: string
+          id?: string
+          image_url?: string | null
+          location: string
+          mint_address?: string | null
+          organizer_wallet: string
+          price: number
+          sold_tickets?: number
+          title: string
+          total_tickets: number
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          currency?: string
+          date?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          location?: string
+          mint_address?: string | null
+          organizer_wallet?: string
+          price?: number
+          sold_tickets?: number
+          title?: string
+          total_tickets?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          id: string
+          owner_wallet: string
+          purchase_currency: string
+          purchase_date: string | null
+          purchase_price: number
+          qr_code: string | null
+          status: string
+          ticket_class: string
+          token_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          id?: string
+          owner_wallet: string
+          purchase_currency?: string
+          purchase_date?: string | null
+          purchase_price: number
+          qr_code?: string | null
+          status?: string
+          ticket_class?: string
+          token_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          owner_wallet?: string
+          purchase_currency?: string
+          purchase_date?: string | null
+          purchase_price?: number
+          qr_code?: string | null
+          status?: string
+          ticket_class?: string
+          token_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_events: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          id: string
+          interaction_type: string
+          user_wallet: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          id?: string
+          interaction_type: string
+          user_wallet: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          interaction_type?: string
+          user_wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      set_current_wallet: {
+        Args: { wallet: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

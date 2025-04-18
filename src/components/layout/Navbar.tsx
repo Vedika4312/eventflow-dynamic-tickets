@@ -3,13 +3,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Wallet } from 'lucide-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { useWalletIntegration } from '@/hooks/useWallet';
+import { truncateAddress } from '@/lib/utils';
 
 const Navbar = () => {
-  const [connected, setConnected] = React.useState(false);
+  const { setVisible } = useWalletModal();
+  const { connected, publicKey } = useWalletIntegration();
   
   const handleConnectWallet = () => {
-    // In a real implementation, this would connect to Solana wallets
-    setConnected(!connected);
+    setVisible(true);
   };
 
   return (
@@ -45,7 +48,7 @@ const Navbar = () => {
           className={connected ? "border-blocktix-purple text-blocktix-purple" : "bg-gradient-purple hover:opacity-90"}
         >
           <Wallet className="mr-2 h-4 w-4" />
-          {connected ? "0x7a...8F3" : "Connect Wallet"}
+          {connected && publicKey ? truncateAddress(publicKey.toString()) : "Connect Wallet"}
         </Button>
       </div>
     </nav>
