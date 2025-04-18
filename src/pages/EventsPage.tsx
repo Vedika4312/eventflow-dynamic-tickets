@@ -1,5 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Filter, Search } from 'lucide-react';
@@ -7,43 +7,41 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { mockEvents } from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+const fetchEvents = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data.length > 0 ? data : mockEvents;
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    toast.error('Failed to load events', {
+      description: 'Please try again later'
+    });
+    return mockEvents;
+  }
+};
 
 const EventsPage = () => {
-  const [events, setEvents] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        // First try to get from Supabase
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setEvents(data);
-        } else {
-          // If no events in Supabase, use mock data
-          setEvents(mockEvents);
-        }
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        // Use mock data as fallback
-        setEvents(mockEvents);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchEvents();
-  }, []);
-  
-  // Get unique categories from events
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+
+  const { 
+    data: events = [], 
+    isLoading, 
+    error 
+  } = useQuery({
+    queryKey: ['events'],
+    queryFn: fetchEvents,
+    retry: 1
+  });
+
   const categories = Array.from(new Set(events.map(event => event.category)));
   
   const filteredEvents = events.filter(event => {
@@ -126,7 +124,7 @@ const EventsPage = () => {
           </div>
         </div>
         
-        {loading ? (
+        {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((item) => (
               <Card key={item} className="border border-white/10 bg-blocktix-dark/50 overflow-hidden">
@@ -145,10 +143,17 @@ const EventsPage = () => {
               </Card>
             ))}
           </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-500">Failed to load events. Please try again later.</p>
+          </div>
         ) : filteredEvents.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEvents.map((event) => (
-              <Card key={event.id} className="border border-white/10 bg-blocktix-dark/50 overflow-hidden hover:shadow-lg hover:shadow-blocktix-purple/20 transition-all duration-300">
+              <Card 
+                key={event.id} 
+                className="border border-white/10 bg-blocktix-dark/50 overflow-hidden hover:shadow-lg hover:shadow-blocktix-purple/20 transition-all duration-300"
+              >
                 <div className="h-48 overflow-hidden relative">
                   <img
                     src={event.image_url || event.image}
