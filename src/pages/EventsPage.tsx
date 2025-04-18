@@ -1,22 +1,56 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Filter, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { mockEvents } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 const EventsPage = () => {
+  const [events, setEvents] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  const categories = Array.from(new Set(mockEvents.map(event => event.category)));
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        // First try to get from Supabase
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setEvents(data);
+        } else {
+          // If no events in Supabase, use mock data
+          setEvents(mockEvents);
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        // Use mock data as fallback
+        setEvents(mockEvents);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEvents();
+  }, []);
   
-  const filteredEvents = mockEvents.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         event.location.toLowerCase().includes(searchTerm.toLowerCase());
+  // Get unique categories from events
+  const categories = Array.from(new Set(events.map(event => event.category)));
+  
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = 
+      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.location.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCategory = selectedCategory ? event.category === selectedCategory : true;
     
@@ -92,13 +126,32 @@ const EventsPage = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.length > 0 ? (
-            filteredEvents.map((event) => (
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <Card key={item} className="border border-white/10 bg-blocktix-dark/50 overflow-hidden">
+                <div className="h-48 bg-gray-800 animate-pulse"></div>
+                <CardContent className="p-5">
+                  <div className="h-6 bg-gray-700 rounded w-3/4 mb-4 animate-pulse"></div>
+                  <div className="h-4 bg-gray-700 rounded w-full mb-2 animate-pulse"></div>
+                  <div className="h-4 bg-gray-700 rounded w-4/5 mb-4 animate-pulse"></div>
+                  <div className="h-4 bg-gray-700 rounded w-2/3 mb-2 animate-pulse"></div>
+                  <div className="h-4 bg-gray-700 rounded w-1/2 mb-4 animate-pulse"></div>
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 bg-gray-700 rounded w-1/3 animate-pulse"></div>
+                    <div className="h-8 bg-gray-700 rounded w-1/3 animate-pulse"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredEvents.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map((event) => (
               <Card key={event.id} className="border border-white/10 bg-blocktix-dark/50 overflow-hidden hover:shadow-lg hover:shadow-blocktix-purple/20 transition-all duration-300">
                 <div className="h-48 overflow-hidden relative">
                   <img
-                    src={event.image}
+                    src={event.image_url || event.image}
                     alt={event.title}
                     className="w-full h-full object-cover"
                   />
@@ -116,7 +169,7 @@ const EventsPage = () => {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric'
-                    })} • {event.time}
+                    })} • {event.time || '19:00'}
                   </div>
                   
                   <div className="flex items-center text-sm text-gray-400 mb-4">
@@ -128,19 +181,19 @@ const EventsPage = () => {
                     <div className="font-medium">
                       <span className="text-blocktix-purple">{event.price} {event.currency}</span>
                     </div>
-                    <Button size="sm" className="bg-gradient-purple hover:opacity-90">
+                    <Button size="sm" className="bg-gradient-purple hover:opacity-90" asChild>
                       <Link to={`/events/${event.id}`}>View Event</Link>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ))
-          ) : (
-            <div className="col-span-3 text-center py-12">
-              <p className="text-gray-400">No events found matching your criteria.</p>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-gray-400">No events found matching your criteria.</p>
+          </div>
+        )}
       </div>
     </Layout>
   );

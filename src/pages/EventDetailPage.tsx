@@ -1,26 +1,161 @@
 
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import Layout from '@/components/layout/Layout';
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Clock, User, Share, Heart, Ticket, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
-import { mockEvents } from '@/data/mockData';
 import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useEventInteraction } from "@/hooks/useEventInteraction";
+import { useTicketPurchase } from "@/hooks/useTicketPurchase";
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from 'sonner';
 
 const EventDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const event = mockEvents.find(e => e.id === id);
-  const [isLiked, setIsLiked] = useState(false);
-  const { toast } = useToast();
+  const [event, setEvent] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [ticketQuantity, setTicketQuantity] = useState(1);
+  const [ticketClass, setTicketClass] = useState<'general' | 'vip' | 'platinum'>('general');
   
-  const handlePurchase = () => {
-    toast({
-      title: "Processing purchase",
-      description: "Connecting to wallet for payment...",
-    });
+  const { publicKey, connected } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { toast: hookToast } = useToast();
+  const { toggleFavorite, isFavorite, isChecking } = useEventInteraction(id || '');
+  const { purchaseTicket, isProcessing } = useTicketPurchase(id || '');
+  
+  useEffect(() => {
+    const fetchEvent = async () => {
+      try {
+        // First try to get from Supabase
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          setEvent(data);
+        } else {
+          // If not found in Supabase, try to use mock data
+          const mockEvents = await import('@/data/mockData').then(module => module.mockEvents);
+          const mockEvent = mockEvents.find(e => e.id === id);
+          
+          if (mockEvent) {
+            setEvent(mockEvent);
+          } else {
+            setEvent(null);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching event:', error);
+        // Try to use mock data as fallback
+        try {
+          const mockEvents = await import('@/data/mockData').then(module => module.mockEvents);
+          const mockEvent = mockEvents.find(e => e.id === id);
+          
+          if (mockEvent) {
+            setEvent(mockEvent);
+          } else {
+            setEvent(null);
+          }
+        } catch (fallbackError) {
+          console.error('Error fetching mock data:', fallbackError);
+          setEvent(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEvent();
+  }, [id]);
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied to clipboard");
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error("Failed to copy link");
+    }
   };
+
+  const handlePurchase = () => {
+    if (!connected) {
+      hookToast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to purchase tickets",
+        variant: "destructive"
+      });
+      setVisible(true);
+      return;
+    }
+    
+    setPurchaseDialogOpen(true);
+  };
+  
+  const confirmPurchase = async () => {
+    if (!event) return;
+    
+    // Calculate price based on ticket class
+    let priceMultiplier = 1;
+    switch (ticketClass) {
+      case 'vip':
+        priceMultiplier = 2.5;
+        break;
+      case 'platinum':
+        priceMultiplier = 5;
+        break;
+      default:
+        priceMultiplier = 1;
+    }
+    
+    const success = await purchaseTicket(event, ticketQuantity, ticketClass);
+    
+    if (success) {
+      setPurchaseDialogOpen(false);
+      
+      // Update the event ticket count in the UI
+      setEvent(prev => ({
+        ...prev,
+        soldTickets: prev.soldTickets + ticketQuantity
+      }));
+    }
+  };
+  
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-16 text-center">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-700 rounded w-1/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-gray-700 rounded w-2/4 mx-auto"></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
   
   if (!event) {
     return (
@@ -63,7 +198,7 @@ const EventDetailPage = () => {
           <div className="lg:col-span-2">
             <div className="rounded-lg overflow-hidden mb-6">
               <img 
-                src={event.image} 
+                src={event.image_url || event.image} 
                 alt={event.title}
                 className="w-full h-64 object-cover"
               />
@@ -75,28 +210,17 @@ const EventDetailPage = () => {
                 <Button 
                   variant="outline" 
                   size="icon" 
-                  className="border-white/20"
-                  onClick={() => {
-                    setIsLiked(!isLiked);
-                    toast({
-                      title: isLiked ? "Removed from favorites" : "Added to favorites",
-                      description: isLiked ? "Event removed from your favorites" : "Event added to your favorites",
-                    });
-                  }}
+                  className={`border-white/20 ${isFavorite ? 'bg-blocktix-dark/80' : ''}`}
+                  onClick={toggleFavorite}
+                  disabled={isChecking}
                 >
-                  <Heart className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
+                  <Heart className={`h-4 w-4 ${isFavorite ? "fill-red-500 text-red-500" : ""}`} />
                 </Button>
                 <Button 
                   variant="outline" 
                   size="icon" 
                   className="border-white/20"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast({
-                      title: "Link copied",
-                      description: "Event link copied to clipboard",
-                    });
-                  }}
+                  onClick={handleShare}
                 >
                   <Share className="h-4 w-4" />
                 </Button>
@@ -116,7 +240,7 @@ const EventDetailPage = () => {
                 <Clock className="h-5 w-5 mr-3 text-blocktix-purple" />
                 <div>
                   <p className="text-sm text-gray-400">Time</p>
-                  <p className="font-medium">{event.time}</p>
+                  <p className="font-medium">{event.time || "19:00"}</p>
                 </div>
               </div>
               
@@ -150,7 +274,9 @@ const EventDetailPage = () => {
                   <User className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="font-medium">{event.organizer}</p>
+                  <p className="font-medium">
+                    {event.organizer || event.organizer_wallet?.substring(0, 6) + '...' + event.organizer_wallet?.slice(-4)}
+                  </p>
                   <p className="text-sm text-gray-400">Event Organizer</p>
                 </div>
               </div>
@@ -206,9 +332,10 @@ const EventDetailPage = () => {
                   className="w-full bg-gradient-purple hover:opacity-90" 
                   size="lg"
                   onClick={handlePurchase}
+                  disabled={isProcessing}
                 >
                   <Ticket className="mr-2 h-4 w-4" />
-                  Purchase NFT Ticket
+                  {isProcessing ? "Processing..." : "Purchase NFT Ticket"}
                 </Button>
                 
                 <p className="text-xs text-gray-400 text-center mt-4">
@@ -220,6 +347,105 @@ const EventDetailPage = () => {
           </div>
         </div>
       </div>
+      
+      <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
+        <DialogContent className="bg-blocktix-dark/90 border-white/10">
+          <DialogHeader>
+            <DialogTitle>Purchase Tickets</DialogTitle>
+            <DialogDescription>
+              Select ticket type and quantity for "{event.title}"
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="ticket-class">
+                Ticket Class
+              </label>
+              <Select 
+                value={ticketClass} 
+                onValueChange={(value) => setTicketClass(value as 'general' | 'vip' | 'platinum')}
+              >
+                <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
+                  <SelectValue placeholder="Select ticket class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General Admission ({event.price} {event.currency})</SelectItem>
+                  <SelectItem value="vip">VIP ({(event.price * 2.5).toFixed(2)} {event.currency})</SelectItem>
+                  <SelectItem value="platinum">Platinum ({(event.price * 5).toFixed(2)} {event.currency})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="ticket-quantity">
+                Quantity
+              </label>
+              <Select 
+                value={ticketQuantity.toString()} 
+                onValueChange={(value) => setTicketQuantity(Number(value))}
+              >
+                <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
+                  <SelectValue placeholder="Select quantity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5].map(num => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} {num === 1 ? 'ticket' : 'tickets'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="bg-black/30 p-4 rounded mt-2">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">Price per ticket:</span>
+                <span>
+                  {ticketClass === 'vip' 
+                    ? (event.price * 2.5).toFixed(2)
+                    : ticketClass === 'platinum'
+                      ? (event.price * 5).toFixed(2)
+                      : event.price
+                  } {event.currency}
+                </span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">Quantity:</span>
+                <span>{ticketQuantity}</span>
+              </div>
+              <div className="flex justify-between font-bold">
+                <span>Total:</span>
+                <span>
+                  {ticketClass === 'vip'
+                    ? (event.price * 2.5 * ticketQuantity).toFixed(2)
+                    : ticketClass === 'platinum'
+                      ? (event.price * 5 * ticketQuantity).toFixed(2)
+                      : (event.price * ticketQuantity).toFixed(2)
+                  } {event.currency}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline"
+              onClick={() => setPurchaseDialogOpen(false)}
+              className="border-white/20"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmPurchase}
+              className="bg-gradient-purple hover:opacity-90"
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Confirm Purchase"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

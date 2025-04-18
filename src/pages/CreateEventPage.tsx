@@ -5,9 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, MapPin, Upload, TicketIcon, CurrencyIcon } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Calendar, Clock, MapPin, Upload, TicketIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useEventCreation } from "@/hooks/useEventCreation";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 const CreateEventPage = () => {
   const [formData, setFormData] = useState({
@@ -21,10 +24,18 @@ const CreateEventPage = () => {
     currency: 'SOL',
     totalTickets: '',
     royaltyPercentage: '5',
-    resellable: true
+    resellable: 'true'
   });
   
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null);
+  const [ticketDesign, setTicketDesign] = useState<File | null>(null);
+  const [ticketDesignPreview, setTicketDesignPreview] = useState<string | null>(null);
+  
   const { toast } = useToast();
+  const { connected } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { createEvent, loading } = useEventCreation();
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -34,23 +45,70 @@ const CreateEventPage = () => {
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setCoverImage(file);
+      
+      // Preview image
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleTicketDesignChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setTicketDesign(file);
+      
+      // Preview image
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setTicketDesignPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Simulate blockchain interaction
-    toast({
-      title: "Processing event creation",
-      description: "Connecting to blockchain...",
-    });
-    
-    // After simulated delay
-    setTimeout(() => {
+    if (!connected) {
       toast({
-        title: "Event created successfully",
-        description: "Your event has been created and tickets are ready to be minted.",
+        title: "Wallet not connected",
+        description: "Please connect your wallet to create an event",
+        variant: "destructive"
       });
-    }, 2000);
+      setVisible(true);
+      return;
+    }
+    
+    // Basic validation
+    if (!formData.title || !formData.description || !formData.date || !formData.time || 
+        !formData.location || !formData.category || !formData.price || !formData.totalTickets) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!coverImage) {
+      toast({
+        title: "Missing image",
+        description: "Please upload a cover image for your event",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create event
+    await createEvent(formData, coverImage, ticketDesign);
   };
 
   return (
@@ -264,8 +322,13 @@ const CreateEventPage = () => {
               </div>
               
               <div className="pt-4">
-                <Button type="submit" className="w-full bg-gradient-purple hover:opacity-90" size="lg">
-                  Create Event & Mint Tickets
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-purple hover:opacity-90" 
+                  size="lg"
+                  disabled={loading}
+                >
+                  {loading ? "Processing..." : "Create Event & Mint Tickets"}
                 </Button>
               </div>
             </form>
@@ -280,17 +343,60 @@ const CreateEventPage = () => {
                   <label className="block text-sm font-medium mb-2">
                     Event Cover Image
                   </label>
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 flex flex-col items-center justify-center">
-                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-400 text-center mb-2">
-                      Drag & drop or click to upload
-                    </p>
-                    <p className="text-xs text-gray-500 text-center">
-                      Recommended: 1200 x 630px
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-4 border-white/20">
-                      Upload Image
-                    </Button>
+                  <div 
+                    className={`border-2 border-dashed ${coverImagePreview ? 'border-blocktix-purple' : 'border-white/20'} rounded-lg p-6 flex flex-col items-center justify-center`}
+                  >
+                    {coverImagePreview ? (
+                      <div className="w-full">
+                        <img 
+                          src={coverImagePreview} 
+                          alt="Cover Preview" 
+                          className="w-full h-32 object-cover rounded-md mb-2"
+                        />
+                        <p className="text-xs text-gray-400 text-center mb-2">
+                          {coverImage?.name}
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 border-white/20 w-full"
+                          onClick={() => {
+                            setCoverImage(null);
+                            setCoverImagePreview(null);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-400 text-center mb-2">
+                          Drag & drop or click to upload
+                        </p>
+                        <p className="text-xs text-gray-500 text-center">
+                          Recommended: 1200 x 630px
+                        </p>
+                        <label htmlFor="cover-upload">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-4 border-white/20"
+                            type="button"
+                            onClick={() => document.getElementById('cover-upload')?.click()}
+                          >
+                            Upload Image
+                          </Button>
+                          <input 
+                            id="cover-upload" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden"
+                            onChange={handleCoverImageChange}
+                          />
+                        </label>
+                      </>
+                    )}
                   </div>
                 </div>
                 
@@ -298,17 +404,60 @@ const CreateEventPage = () => {
                   <label className="block text-sm font-medium mb-2">
                     NFT Ticket Design
                   </label>
-                  <div className="border-2 border-dashed border-white/20 rounded-lg p-6 flex flex-col items-center justify-center">
-                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-400 text-center mb-2">
-                      Upload ticket artwork
-                    </p>
-                    <p className="text-xs text-gray-500 text-center">
-                      This will be used for the NFT ticket design
-                    </p>
-                    <Button variant="outline" size="sm" className="mt-4 border-white/20">
-                      Upload Design
-                    </Button>
+                  <div 
+                    className={`border-2 border-dashed ${ticketDesignPreview ? 'border-blocktix-purple' : 'border-white/20'} rounded-lg p-6 flex flex-col items-center justify-center`}
+                  >
+                    {ticketDesignPreview ? (
+                      <div className="w-full">
+                        <img 
+                          src={ticketDesignPreview} 
+                          alt="Ticket Design Preview" 
+                          className="w-full h-32 object-cover rounded-md mb-2"
+                        />
+                        <p className="text-xs text-gray-400 text-center mb-2">
+                          {ticketDesign?.name}
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 border-white/20 w-full"
+                          onClick={() => {
+                            setTicketDesign(null);
+                            setTicketDesignPreview(null);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-400 text-center mb-2">
+                          Upload ticket artwork
+                        </p>
+                        <p className="text-xs text-gray-500 text-center">
+                          This will be used for the NFT ticket design
+                        </p>
+                        <label htmlFor="ticket-upload">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-4 border-white/20"
+                            type="button"
+                            onClick={() => document.getElementById('ticket-upload')?.click()}
+                          >
+                            Upload Design
+                          </Button>
+                          <input 
+                            id="ticket-upload" 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden"
+                            onChange={handleTicketDesignChange}
+                          />
+                        </label>
+                      </>
+                    )}
                   </div>
                 </div>
                 
