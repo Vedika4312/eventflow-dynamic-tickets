@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
@@ -5,9 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Filter, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
-import { mockEvents } from '@/data/mockData';
+import { mockEvents, Event } from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Define a type that can handle both Supabase events and mock events
+type EventSource = Event | {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  price: number;
+  currency: string;
+  category: string;
+  image_url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  mint_address?: string | null;
+  organizer_wallet: string;
+  total_tickets: number;
+  sold_tickets: number;
+}
 
 const fetchEvents = async () => {
   try {
@@ -54,6 +74,28 @@ const EventsPage = () => {
     
     return matchesSearch && matchesCategory;
   });
+
+  // Helper function to get image URL regardless of the source
+  const getImageUrl = (event: EventSource) => {
+    if ('image_url' in event && event.image_url) {
+      return event.image_url;
+    } else if ('image' in event && event.image) {
+      return event.image;
+    }
+    return 'https://source.unsplash.com/random/400x300/?event'; // Fallback image
+  };
+
+  // Helper function to format event date and time
+  const formatDateTime = (event: EventSource) => {
+    const date = new Date(event.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    
+    const time = 'time' in event && event.time ? event.time : '19:00';
+    return `${date} • ${time}`;
+  };
 
   return (
     <Layout>
@@ -156,7 +198,7 @@ const EventsPage = () => {
               >
                 <div className="h-48 overflow-hidden relative">
                   <img
-                    src={event.image_url || event.image}
+                    src={getImageUrl(event)}
                     alt={event.title}
                     className="w-full h-full object-cover"
                   />
@@ -170,11 +212,7 @@ const EventsPage = () => {
                   
                   <div className="flex items-center text-sm text-gray-400 mb-2">
                     <Calendar className="h-4 w-4 mr-2" />
-                    {new Date(event.date).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })} • {event.time || '19:00'}
+                    {formatDateTime(event)}
                   </div>
                   
                   <div className="flex items-center text-sm text-gray-400 mb-4">
