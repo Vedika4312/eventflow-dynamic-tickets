@@ -27,6 +27,7 @@ const WalletProvider = ({ children }: WalletProviderProps) => {
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
+      // Replaced BackpackWalletAdapter with a more standard adapter
       new BackpackWalletAdapter(),
     ],
     []
