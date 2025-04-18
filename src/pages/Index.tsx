@@ -1,13 +1,50 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import Layout from '@/components/layout/Layout';
+import Hero from '@/components/home/Hero';
+import FeaturedEvents from '@/components/event/FeaturedEvents';
+import HowItWorks from '@/components/home/HowItWorks';
+import Advantages from '@/components/home/Advantages';
+import DynamicTicket from '@/components/ticket/DynamicTicket';
+import { mockEvents, mockTickets } from '@/data/mockData';
 
 const Index = () => {
+  // Sample ticket for demonstration
+  const demoEvent = mockEvents[0];
+  const demoTicket = mockTickets[0];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <Layout>
+      <Hero />
+      <FeaturedEvents />
+      <HowItWorks />
+      
+      <div className="bg-gradient-dark py-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Dynamic NFT Tickets</h2>
+            <p className="max-w-2xl mx-auto text-gray-400">
+              Each ticket is a unique digital asset that transforms throughout the event lifecycle.
+              Hover over or tap the ticket to see it in action.
+            </p>
+          </div>
+          
+          <div className="max-w-xs mx-auto">
+            <DynamicTicket
+              eventTitle={demoEvent.title}
+              eventDate={demoEvent.date}
+              eventLocation={demoEvent.location}
+              ticketClass="vip"
+              status="upcoming"
+              tokenId={demoTicket.tokenId}
+              qrCode={demoTicket.qrCode}
+            />
+          </div>
+        </div>
       </div>
-    </div>
+      
+      <Advantages />
+    </Layout>
   );
 };
 
