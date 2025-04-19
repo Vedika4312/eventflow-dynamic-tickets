@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { 
@@ -6,7 +5,9 @@ import {
   PublicKey, 
   Transaction, 
   SystemProgram, 
-  LAMPORTS_PER_SOL 
+  LAMPORTS_PER_SOL,
+  TransactionMessage,
+  VersionedTransaction 
 } from "@solana/web3.js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -89,20 +90,35 @@ export const useTicketPurchase = (eventId: string) => {
         // Convert price to lamports (SOL's smallest unit)
         const lamports = totalPrice * LAMPORTS_PER_SOL;
         
-        // Create transaction
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(eventData.organizer_wallet),
-            lamports,
-          })
-        );
+        // Get latest blockhash
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+        // Create instruction
+        const transferInstruction = SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: new PublicKey(eventData.organizer_wallet),
+          lamports,
+        });
+
+        // Create message with metadata
+        const messageV0 = new TransactionMessage({
+          payerKey: publicKey,
+          recentBlockhash: blockhash,
+          instructions: [transferInstruction],
+        }).compileToV0Message();
+
+        // Create versioned transaction
+        const transaction = new VersionedTransaction(messageV0);
 
         // Send transaction
         const signature = await sendTransaction(transaction, connection);
         
         // Wait for confirmation
-        const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+        const confirmation = await connection.confirmTransaction({
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        });
         
         if (confirmation.value.err) {
           throw new Error("Transaction failed to confirm");
