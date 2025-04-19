@@ -37,7 +37,10 @@ export const useEventCreation = () => {
             upsert: true
           });
 
-        if (imageError) throw imageError;
+        if (imageError) {
+          console.error("Error uploading cover image:", imageError);
+          throw new Error(`Failed to upload cover image: ${imageError.message}`);
+        }
         
         const { data: { publicUrl } } = supabase.storage
           .from('events')
@@ -58,7 +61,10 @@ export const useEventCreation = () => {
             upsert: true
           });
 
-        if (designError) throw designError;
+        if (designError) {
+          console.error("Error uploading ticket design:", designError);
+          throw new Error(`Failed to upload ticket design: ${designError.message}`);
+        }
         
         const { data: { publicUrl } } = supabase.storage
           .from('events')
@@ -86,7 +92,10 @@ export const useEventCreation = () => {
         })
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error inserting event data:", error);
+        throw new Error(`Failed to create event in database: ${error.message}`);
+      }
 
       // Add user interaction record
       await supabase
@@ -107,7 +116,7 @@ export const useEventCreation = () => {
     } catch (error) {
       console.error("Error creating event:", error);
       toast.error("Failed to create event", {
-        description: "There was a problem creating your event. Please try again."
+        description: error instanceof Error ? error.message : "There was a problem creating your event. Please try again."
       });
       setLoading(false);
       return false;
