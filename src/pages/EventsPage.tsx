@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
@@ -9,8 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { mockEvents, Event } from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useEventSubscription } from '@/hooks/useEventSubscription';
 
-// Define a type that can handle both Supabase events and mock events
 type EventSource = Event | {
   id: string;
   title: string;
@@ -51,6 +50,8 @@ const fetchEvents = async () => {
 const EventsPage = () => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+  
+  useEventSubscription();
 
   const { 
     data: events = [], 
@@ -75,17 +76,15 @@ const EventsPage = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Helper function to get image URL regardless of the source
   const getImageUrl = (event: EventSource) => {
     if ('image_url' in event && event.image_url) {
       return event.image_url;
     } else if ('image' in event && event.image) {
       return event.image;
     }
-    return 'https://source.unsplash.com/random/400x300/?event'; // Fallback image
+    return 'https://source.unsplash.com/random/400x300/?event';
   };
 
-  // Helper function to format event date and time
   const formatDateTime = (event: EventSource) => {
     const date = new Date(event.date).toLocaleDateString('en-US', {
       month: 'short',

@@ -4,10 +4,42 @@ import { Button } from "@/components/ui/button";
 import { Calendar, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
-import { mockEvents } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from "@/integrations/supabase/client";
+import { useEventSubscription } from '@/hooks/useEventSubscription';
+
+const fetchFeaturedEvents = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(3);
+    
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching featured events:', error);
+    return [];
+  }
+};
 
 const FeaturedEvents = () => {
-  const featuredEvents = mockEvents.filter(event => event.featured);
+  // Use the real-time subscription hook
+  useEventSubscription();
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['events', 'featured'],
+    queryFn: fetchFeaturedEvents,
+  });
+
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
   return (
     <div className="py-16">
@@ -18,11 +50,11 @@ const FeaturedEvents = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuredEvents.map((event) => (
+          {events.map((event) => (
             <Card key={event.id} className="border border-white/10 bg-blocktix-dark/50 overflow-hidden hover:shadow-lg hover:shadow-blocktix-purple/20 transition-all duration-300">
               <div className="h-48 overflow-hidden relative">
                 <img
-                  src={event.image}
+                  src={event.image_url || 'https://source.unsplash.com/random/400x300/?event'}
                   alt={event.title}
                   className="w-full h-full object-cover"
                 />
@@ -36,11 +68,7 @@ const FeaturedEvents = () => {
                 
                 <div className="flex items-center text-sm text-gray-400 mb-2">
                   <Calendar className="h-4 w-4 mr-2" />
-                  {new Date(event.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })} • {event.time}
+                  {formatDateTime(event.date)}
                 </div>
                 
                 <div className="flex items-center text-sm text-gray-400 mb-4">
@@ -52,7 +80,7 @@ const FeaturedEvents = () => {
                   <div className="font-medium">
                     <span className="text-blocktix-purple">{event.price} {event.currency}</span>
                   </div>
-                  <Button size="sm" className="bg-gradient-purple hover:opacity-90">
+                  <Button size="sm" className="bg-gradient-purple hover:opacity-90" asChild>
                     <Link to={`/events/${event.id}`}>View Event</Link>
                   </Button>
                 </div>
@@ -62,7 +90,7 @@ const FeaturedEvents = () => {
         </div>
         
         <div className="mt-10 text-center">
-          <Button variant="outline" className="border-blocktix-purple text-blocktix-purple hover:bg-blocktix-purple/10">
+          <Button variant="outline" className="border-blocktix-purple text-blocktix-purple hover:bg-blocktix-purple/10" asChild>
             <Link to="/events">View All Events</Link>
           </Button>
         </div>
