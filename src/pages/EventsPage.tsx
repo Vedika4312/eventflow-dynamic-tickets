@@ -2,13 +2,25 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layout/Layout';
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Filter, Search } from 'lucide-react';
+import { Calendar, MapPin, Filter, Search, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { mockEvents, Event } from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useEventSubscription } from '@/hooks/useEventSubscription';
+import { useAdmin } from '@/hooks/useAdmin';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type EventSource = Event | {
   id: string;
@@ -50,13 +62,15 @@ const fetchEvents = async () => {
 const EventsPage = () => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+  const { isAdmin, deleteEvent } = useAdmin();
   
   useEventSubscription();
 
   const { 
     data: events = [], 
     isLoading, 
-    error 
+    error,
+    refetch 
   } = useQuery({
     queryKey: ['events'],
     queryFn: fetchEvents,
@@ -94,6 +108,13 @@ const EventsPage = () => {
     
     const time = 'time' in event && event.time ? event.time : '19:00';
     return `${date} • ${time}`;
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    const success = await deleteEvent(eventId);
+    if (success) {
+      refetch();
+    }
   };
 
   return (
@@ -223,9 +244,38 @@ const EventsPage = () => {
                     <div className="font-medium">
                       <span className="text-blocktix-purple">{event.price} {event.currency}</span>
                     </div>
-                    <Button size="sm" className="bg-gradient-purple hover:opacity-90" asChild>
-                      <Link to={`/events/${event.id}`}>View Event</Link>
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="bg-gradient-purple hover:opacity-90" asChild>
+                        <Link to={`/events/${event.id}`}>View Event</Link>
+                      </Button>
+                      
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this event? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteEvent(event.id)}
+                                className="bg-red-500 hover:bg-red-600"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
