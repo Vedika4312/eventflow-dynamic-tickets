@@ -21,8 +21,16 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
-    // This fixes issues with the Buffer polyfill
+    // These polyfills are needed for Solana wallet compatibility
     'process.env': {},
-    global: {},
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      // Node.js global to browser globalThis
+      define: {
+        global: 'globalThis',
+      },
+    },
   },
 }));

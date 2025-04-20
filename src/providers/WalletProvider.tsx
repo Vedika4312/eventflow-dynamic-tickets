@@ -13,13 +13,13 @@ import {
 import { clusterApiUrl } from "@solana/web3.js";
 import { useMemo } from "react";
 
-// Buffer polyfill for browser environment
-import { Buffer } from "buffer";
-// Make Buffer available globally
-window.Buffer = Buffer;
-
-// Import the CSS using ES module import instead of require
+// Import the CSS using ES module import
 import "@solana/wallet-adapter-react-ui/styles.css";
+
+// Buffer polyfill - make sure this is imported and set BEFORE any wallet adapter code runs
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || require('buffer').Buffer;
+}
 
 interface WalletProviderProps {
   children: React.ReactNode;
