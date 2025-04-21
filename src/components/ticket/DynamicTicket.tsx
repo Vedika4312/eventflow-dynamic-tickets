@@ -10,7 +10,7 @@ interface DynamicTicketProps {
   ticketClass: 'general' | 'vip' | 'platinum';
   status: 'upcoming' | 'active' | 'used' | 'expired';
   tokenId: string;
-  qrCode?: string;
+  qrCode: string;
 }
 
 const DynamicTicket: React.FC<DynamicTicketProps> = ({
