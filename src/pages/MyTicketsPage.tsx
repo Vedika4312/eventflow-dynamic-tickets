@@ -114,8 +114,8 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={ticket.ticket_class}
-                        status={ticket.status}
+                        ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum") || "general"}
+                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
                         tokenId={ticket.token_id}
                         qrCode={ticket.qr_code || undefined}
                       />
@@ -145,8 +145,8 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={ticket.ticket_class}
-                        status={ticket.status}
+                        ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum") || "general"}
+                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
                         tokenId={ticket.token_id}
                         qrCode={ticket.qr_code || undefined}
                       />
