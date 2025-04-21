@@ -8,14 +8,13 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
-    port: 5173,
+    port: 8080,
     open: true,
-    cors: true
+    cors: true,
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    mode === "development" && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -24,14 +23,14 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     // These polyfills are needed for Solana wallet compatibility
-    'process.env': {},
-    global: 'globalThis',
+    "process.env": {},
+    global: "globalThis",
   },
   optimizeDeps: {
     esbuildOptions: {
       // Node.js global to browser globalThis
       define: {
-        global: 'globalThis',
+        global: "globalThis",
       },
     },
   },
