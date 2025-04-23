@@ -79,18 +79,18 @@ const Navbar = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-blocktix-dark border-white/10">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem asChild>
-                  <Link to="/my-tickets" className="cursor-pointer">
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link to="/my-tickets" className="w-full cursor-pointer">
                     My Tickets
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/create" className="cursor-pointer">
+                <DropdownMenuItem>
+                  <Link to="/create" className="w-full cursor-pointer">
                     Create Event
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={disconnect}
                   className="text-red-500 cursor-pointer"
