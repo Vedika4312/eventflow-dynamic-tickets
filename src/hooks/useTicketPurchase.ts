@@ -15,18 +15,20 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { clusterApiUrl } from "@solana/web3.js";
+import { useMonadPayment } from "./useMonadPayment";
 
 export const useTicketPurchase = (eventId: string) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { publicKey, sendTransaction } = useWallet();
+  const { processMonadPayment } = useMonadPayment();
   
   const purchaseTicket = async (
     event: any, 
     quantity: number = 1, 
     ticketClass: 'general' | 'vip' | 'platinum' = 'general',
-    paymentMethod: 'SOL' | 'TOKEN' = 'SOL'
+    paymentMethod: 'SOL' | 'TOKEN' | 'MONAD' = 'SOL'
   ) => {
-    if (!publicKey || !sendTransaction) {
+    if (!publicKey && paymentMethod !== 'MONAD') {
       toast.error("Wallet not connected", {
         description: "Please connect your wallet to purchase tickets"
       });
@@ -83,6 +85,8 @@ export const useTicketPurchase = (eventId: string) => {
       const totalPrice = eventData.price * quantity * priceMultiplier;
 
       // Handle payment based on selected method
+      let paymentSuccess = false;
+      
       if (paymentMethod === 'SOL') {
         // For SOL transactions (existing code)
         const connection = new Connection(
@@ -126,6 +130,8 @@ export const useTicketPurchase = (eventId: string) => {
         if (confirmation.value.err) {
           throw new Error("Transaction failed to confirm");
         }
+        
+        paymentSuccess = true;
       } else if (paymentMethod === 'TOKEN') {
         // Placeholder for token transactions
         // In a production app, this would integrate with token transfer logic
@@ -138,8 +144,20 @@ export const useTicketPurchase = (eventId: string) => {
         
         // Add a slight delay to simulate processing
         await new Promise(resolve => setTimeout(resolve, 1000));
+        paymentSuccess = true;
+      } else if (paymentMethod === 'MONAD') {
+        // For Monad blockchain payments
+        const monadWalletAddress = eventData.organizer_monad_wallet || "0x1234567890123456789012345678901234567890"; // Default demo Monad wallet
+        
+        // Process payment via Monad
+        paymentSuccess = await processMonadPayment(monadWalletAddress, totalPrice);
       } else {
         throw new Error("Unsupported payment method");
+      }
+      
+      if (!paymentSuccess) {
+        setIsProcessing(false);
+        return false;
       }
 
       // Generate ticket records
@@ -151,9 +169,10 @@ export const useTicketPurchase = (eventId: string) => {
         tickets.push({
           id: ticketId,
           event_id: eventId,
-          owner_wallet: publicKey.toString(),
+          owner_wallet: publicKey ? publicKey.toString() : "monad-user", // Handle Monad users differently
           purchase_price: eventData.price * priceMultiplier,
-          purchase_currency: paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency,
+          purchase_currency: paymentMethod === 'MONAD' ? 'MONAD' : 
+                             paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency,
           token_id: `${paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
           ticket_class: ticketClass.toUpperCase(),
           qr_code: qrCode
@@ -180,7 +199,7 @@ export const useTicketPurchase = (eventId: string) => {
           await supabase
             .from('user_events')
             .insert({
-              user_wallet: publicKey.toString(),
+              user_wallet: publicKey ? publicKey.toString() : "monad-user", // Handle Monad users differently
               event_id: eventId,
               interaction_type: 'purchased'
             });

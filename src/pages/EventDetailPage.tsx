@@ -34,7 +34,7 @@ const EventDetailPage = () => {
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [ticketQuantity, setTicketQuantity] = useState(1);
   const [ticketClass, setTicketClass] = useState<'general' | 'vip' | 'platinum'>('general');
-  const [paymentMethod, setPaymentMethod] = useState<'SOL' | 'TOKEN'>('SOL');
+  const [paymentMethod, setPaymentMethod] = useState<'SOL' | 'TOKEN' | 'MONAD'>('SOL');
   
   const { publicKey, connected } = useWallet();
   const { setVisible } = useWalletModal();
@@ -399,19 +399,25 @@ const EventDetailPage = () => {
               </label>
               <Select 
                 value={paymentMethod} 
-                onValueChange={(value) => setPaymentMethod(value as 'SOL' | 'TOKEN')}
+                onValueChange={(value) => setPaymentMethod(value as 'SOL' | 'TOKEN' | 'MONAD')}
               >
                 <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SOL">Pay with SOL</SelectItem>
+                  <SelectItem value="MONAD">Pay with Monad (ETH)</SelectItem>
                   <SelectItem value="TOKEN">Pay with TOKEN (Demo Mode)</SelectItem>
                 </SelectContent>
               </Select>
               {paymentMethod === 'TOKEN' && (
                 <p className="text-xs text-amber-400 mt-1">
-                  Token payment is currently in demo mode and will simulate the transaction.
+                  Token payment is in demo mode and will simulate the transaction.
+                </p>
+              )}
+              {paymentMethod === 'MONAD' && (
+                <p className="text-xs text-cyan-400 mt-1">
+                  Make sure you have the MetaMask wallet extension installed to use Monad blockchain.
                 </p>
               )}
             </div>
