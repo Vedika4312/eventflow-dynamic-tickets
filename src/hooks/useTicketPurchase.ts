@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { 
@@ -149,7 +148,7 @@ export const useTicketPurchase = (eventId: string) => {
         // For Monad blockchain payments
         const monadWalletAddress = eventData.organizer_monad_wallet || "0x1234567890123456789012345678901234567890"; // Default demo Monad wallet
         
-        // Process payment via Monad
+        // Process payment directly via Monad using existing wallet
         paymentSuccess = await processMonadPayment(monadWalletAddress, totalPrice);
       } else {
         throw new Error("Unsupported payment method");

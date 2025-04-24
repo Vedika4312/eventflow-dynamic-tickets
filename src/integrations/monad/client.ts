@@ -17,70 +17,70 @@ export const getMonadProvider = (): ethers.JsonRpcProvider => {
 // Add Monad network to MetaMask
 export const addMonadNetworkToMetaMask = async (): Promise<boolean> => {
   try {
-    // Check if ethereum object is available (MetaMask is installed)
-    if (window.ethereum) {
-      await window.ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: `0x${MONAD_CHAIN_ID.toString(16)}`,
-            chainName: MONAD_CHAIN_NAME,
-            nativeCurrency: {
-              name: MONAD_CURRENCY_SYMBOL,
-              symbol: MONAD_CURRENCY_SYMBOL,
-              decimals: MONAD_CURRENCY_DECIMALS,
-            },
-            rpcUrls: [MONAD_RPC_URL],
-            blockExplorerUrls: [MONAD_BLOCK_EXPLORER],
-          },
-        ],
-      });
-      return true;
+    if (!window.ethereum) {
+      throw new Error("MetaMask is not installed");
     }
-    return false;
+
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: `0x${MONAD_CHAIN_ID.toString(16)}`,
+          chainName: MONAD_CHAIN_NAME,
+          nativeCurrency: {
+            name: MONAD_CURRENCY_SYMBOL,
+            symbol: MONAD_CURRENCY_SYMBOL,
+            decimals: MONAD_CURRENCY_DECIMALS,
+          },
+          rpcUrls: [MONAD_RPC_URL],
+          blockExplorerUrls: [MONAD_BLOCK_EXPLORER],
+        },
+      ],
+    });
+    return true;
   } catch (error) {
     console.error("Failed to add Monad network:", error);
     return false;
   }
 };
 
-// Connect to MetaMask and switch to Monad network
-export const connectToMonad = async (): Promise<string | null> => {
+// Connect to existing Monad wallet and ensure correct network
+export const ensureMonadConnection = async (): Promise<string | null> => {
   try {
     if (!window.ethereum) {
       throw new Error("MetaMask is not installed");
     }
 
-    // Request account access
+    // Request account access if needed
     const accounts = await window.ethereum.request({
       method: "eth_requestAccounts",
     });
 
-    // Switch to Monad network
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: `0x${MONAD_CHAIN_ID.toString(16)}` }],
-      });
-    } catch (switchError: any) {
-      // If the network doesn't exist, add it
-      if (switchError.code === 4902) {
-        await addMonadNetworkToMetaMask();
-      } else {
-        throw switchError;
+    // Get current chain ID
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    
+    // If not on Monad network, try to switch
+    if (chainId !== `0x${MONAD_CHAIN_ID.toString(16)}`) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: `0x${MONAD_CHAIN_ID.toString(16)}` }],
+        });
+      } catch (switchError: any) {
+        // If network doesn't exist, add it
+        if (switchError.code === 4902) {
+          await addMonadNetworkToMetaMask();
+        } else {
+          throw switchError;
+        }
       }
     }
 
     return accounts[0];
   } catch (error) {
-    console.error("Failed to connect to Monad:", error);
+    console.error("Failed to ensure Monad connection:", error);
     return null;
   }
-};
-
-// Convert price to wei
-export const convertPriceToWei = (price: number): string => {
-  return ethers.parseEther(price.toString()).toString();
 };
 
 // Send transaction on Monad
@@ -89,18 +89,14 @@ export const sendMonadTransaction = async (
   amount: number
 ): Promise<string | null> => {
   try {
-    if (!window.ethereum) {
-      throw new Error("MetaMask is not installed");
+    const address = await ensureMonadConnection();
+    if (!address) {
+      throw new Error("Failed to connect to Monad wallet");
     }
-
-    const accounts = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
-    const fromAddress = accounts[0];
 
     // Create transaction object
     const transactionParameters = {
-      from: fromAddress,
+      from: address,
       to: toAddress,
       value: ethers.toBeHex(ethers.parseEther(amount.toString())),
       gasLimit: ethers.toBeHex(21000),
@@ -119,17 +115,16 @@ export const sendMonadTransaction = async (
   }
 };
 
-// Define the window ethereum property for TypeScript
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
+// Convert price to wei
+export const convertPriceToWei = (price: number): string => {
+  return ethers.parseEther(price.toString()).toString();
+};
 
 export default {
   getMonadProvider,
   addMonadNetworkToMetaMask,
-  connectToMonad,
+  ensureMonadConnection,
   convertPriceToWei,
   sendMonadTransaction,
 };
+
