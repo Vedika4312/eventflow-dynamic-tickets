@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -13,7 +12,7 @@ export default {
 	theme: {
 		container: {
 			center: true,
-			padding: '2rem',
+			padding: "2rem",
 			screens: {
 				'2xl': '1400px'
 			}
@@ -85,24 +84,35 @@ export default {
 					from: { height: 'var(--radix-accordion-content-height)' },
 					to: { height: '0' }
 				},
-				'pulse-slow': {
-					'0%, 100%': { opacity: '1' },
-					'50%': { opacity: '0.8' }
+				'fade-in': {
+					'0%': { 
+						opacity: '0',
+						transform: 'translateY(10px)'
+					},
+					'100%': {
+						opacity: '1',
+						transform: 'translateY(0)'
+					}
 				},
-				'ticket-flip': {
-					'0%': { transform: 'rotateY(0deg)' },
-					'100%': { transform: 'rotateY(180deg)' }
+				'float': {
+					'0%, 100%': {
+						transform: 'translateY(0)'
+					},
+					'50%': {
+						transform: 'translateY(-5px)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
-				'ticket-flip': 'ticket-flip 0.6s ease-out forwards'
+				'fade-in': 'fade-in 0.6s ease-out forwards',
+				'float': 'float 3s ease-in-out infinite',
 			},
 			backgroundImage: {
 				'gradient-purple': 'linear-gradient(to right, #8B5CF6, #D946EF)',
-				'gradient-dark': 'linear-gradient(to bottom, #1A1F2C, #2A2F3C)'
+				'gradient-dark': 'linear-gradient(to bottom, #1A1F2C, #2A2F3C)',
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
 			}
 		}
 	},
