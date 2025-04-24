@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { 
@@ -22,7 +23,8 @@ export const useTicketPurchase = (eventId: string) => {
   const purchaseTicket = async (
     event: any, 
     quantity: number = 1, 
-    ticketClass: 'general' | 'vip' | 'platinum' = 'general'
+    ticketClass: 'general' | 'vip' | 'platinum' = 'general',
+    paymentMethod: 'SOL' | 'TOKEN' = 'SOL'
   ) => {
     if (!publicKey || !sendTransaction) {
       toast.error("Wallet not connected", {
@@ -80,8 +82,9 @@ export const useTicketPurchase = (eventId: string) => {
 
       const totalPrice = eventData.price * quantity * priceMultiplier;
 
-      // For SOL transactions
-      if (eventData.currency === 'SOL') {
+      // Handle payment based on selected method
+      if (paymentMethod === 'SOL') {
+        // For SOL transactions (existing code)
         const connection = new Connection(
           clusterApiUrl(WalletAdapterNetwork.Devnet), 
           'confirmed'
@@ -123,73 +126,80 @@ export const useTicketPurchase = (eventId: string) => {
         if (confirmation.value.err) {
           throw new Error("Transaction failed to confirm");
         }
-
-        // Generate ticket records
-        const tickets = [];
-        for (let i = 0; i < quantity; i++) {
-          const ticketId = uuidv4();
-          const qrCode = `https://blocktix-qr.vercel.app/ticket/${ticketId}`;
-          
-          tickets.push({
-            id: ticketId,
-            event_id: eventId,
-            owner_wallet: publicKey.toString(),
-            purchase_price: eventData.price * priceMultiplier,
-            purchase_currency: eventData.currency,
-            token_id: `SOL-TICKET-${ticketId.substring(0, 8)}`,
-            ticket_class: ticketClass.toUpperCase(),
-            qr_code: qrCode
-          });
-        }
-
-        try {
-          // Only insert to database for valid UUIDs (real events)
-          if (isValidUuid) {
-            // Insert tickets to database
-            const { error: ticketError } = await supabase
-              .from('tickets')
-              .insert(tickets);
-
-            if (ticketError) throw ticketError;
-            
-            // Update event sold tickets count
-            await supabase
-              .from('events')
-              .update({ sold_tickets: event.sold_tickets + quantity })
-              .eq('id', eventId);
-
-            // Record the purchase interaction
-            await supabase
-              .from('user_events')
-              .insert({
-                user_wallet: publicKey.toString(),
-                event_id: eventId,
-                interaction_type: 'purchased'
-              });
-          }
-          
-          toast.success("Purchase successful!", {
-            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
-          });
-          
-          setIsProcessing(false);
-          return true;
-        } catch (dbError) {
-          console.error("Database operation failed but blockchain transaction succeeded:", dbError);
-          // Still return true since the blockchain transaction was successful
-          toast.success("Purchase successful!", {
-            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
-          });
-          setIsProcessing(false);
-          return true;
-        }
+      } else if (paymentMethod === 'TOKEN') {
+        // Placeholder for token transactions
+        // In a production app, this would integrate with token transfer logic
+        console.log("Token payment selected - would process token transfer here");
+        
+        // Simulate a successful token transaction for demo purposes
+        toast.info("Token payment simulation", {
+          description: "In a production app, this would process a real token transfer"
+        });
+        
+        // Add a slight delay to simulate processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } else {
-        // For other currencies like USDC
-        toast.error("Currency not supported yet", {
-          description: `${eventData.currency} transactions are not yet supported`
+        throw new Error("Unsupported payment method");
+      }
+
+      // Generate ticket records
+      const tickets = [];
+      for (let i = 0; i < quantity; i++) {
+        const ticketId = uuidv4();
+        const qrCode = `https://blocktix-qr.vercel.app/ticket/${ticketId}`;
+        
+        tickets.push({
+          id: ticketId,
+          event_id: eventId,
+          owner_wallet: publicKey.toString(),
+          purchase_price: eventData.price * priceMultiplier,
+          purchase_currency: paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency,
+          token_id: `${paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
+          ticket_class: ticketClass.toUpperCase(),
+          qr_code: qrCode
+        });
+      }
+
+      try {
+        // Only insert to database for valid UUIDs (real events)
+        if (isValidUuid) {
+          // Insert tickets to database
+          const { error: ticketError } = await supabase
+            .from('tickets')
+            .insert(tickets);
+
+          if (ticketError) throw ticketError;
+          
+          // Update event sold tickets count
+          await supabase
+            .from('events')
+            .update({ sold_tickets: event.sold_tickets + quantity })
+            .eq('id', eventId);
+
+          // Record the purchase interaction
+          await supabase
+            .from('user_events')
+            .insert({
+              user_wallet: publicKey.toString(),
+              event_id: eventId,
+              interaction_type: 'purchased'
+            });
+        }
+        
+        toast.success("Purchase successful!", {
+          description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
+        });
+        
+        setIsProcessing(false);
+        return true;
+      } catch (dbError) {
+        console.error("Database operation failed but blockchain transaction succeeded:", dbError);
+        // Still return true since the blockchain transaction was successful
+        toast.success("Purchase successful!", {
+          description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
         });
         setIsProcessing(false);
-        return false;
+        return true;
       }
     } catch (error) {
       console.error("Error purchasing ticket:", error);

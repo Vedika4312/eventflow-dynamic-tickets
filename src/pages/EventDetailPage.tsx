@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
@@ -35,6 +34,7 @@ const EventDetailPage = () => {
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [ticketQuantity, setTicketQuantity] = useState(1);
   const [ticketClass, setTicketClass] = useState<'general' | 'vip' | 'platinum'>('general');
+  const [paymentMethod, setPaymentMethod] = useState<'SOL' | 'TOKEN'>('SOL');
   
   const { publicKey, connected } = useWallet();
   const { setVisible } = useWalletModal();
@@ -45,7 +45,6 @@ const EventDetailPage = () => {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        // First try to get from Supabase
         const { data, error } = await supabase
           .from('events')
           .select('*')
@@ -57,7 +56,6 @@ const EventDetailPage = () => {
         if (data) {
           setEvent(data);
         } else {
-          // If not found in Supabase, try to use mock data
           const mockEvents = await import('@/data/mockData').then(module => module.mockEvents);
           const mockEvent = mockEvents.find(e => e.id === id);
           
@@ -69,7 +67,6 @@ const EventDetailPage = () => {
         }
       } catch (error) {
         console.error('Error fetching event:', error);
-        // Try to use mock data as fallback
         try {
           const mockEvents = await import('@/data/mockData').then(module => module.mockEvents);
           const mockEvent = mockEvents.find(e => e.id === id);
@@ -118,7 +115,6 @@ const EventDetailPage = () => {
   const confirmPurchase = async () => {
     if (!event) return;
     
-    // Calculate price based on ticket class
     let priceMultiplier = 1;
     switch (ticketClass) {
       case 'vip':
@@ -131,12 +127,11 @@ const EventDetailPage = () => {
         priceMultiplier = 1;
     }
     
-    const success = await purchaseTicket(event, ticketQuantity, ticketClass);
+    const success = await purchaseTicket(event, ticketQuantity, ticketClass, paymentMethod);
     
     if (success) {
       setPurchaseDialogOpen(false);
       
-      // Update the event ticket count in the UI
       setEvent(prev => ({
         ...prev,
         soldTickets: prev.soldTickets + ticketQuantity
@@ -398,6 +393,29 @@ const EventDetailPage = () => {
               </Select>
             </div>
             
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="payment-method">
+                Payment Method
+              </label>
+              <Select 
+                value={paymentMethod} 
+                onValueChange={(value) => setPaymentMethod(value as 'SOL' | 'TOKEN')}
+              >
+                <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SOL">Pay with SOL</SelectItem>
+                  <SelectItem value="TOKEN">Pay with TOKEN (Demo Mode)</SelectItem>
+                </SelectContent>
+              </Select>
+              {paymentMethod === 'TOKEN' && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Token payment is currently in demo mode and will simulate the transaction.
+                </p>
+              )}
+            </div>
+            
             <div className="bg-black/30 p-4 rounded mt-2">
               <div className="flex justify-between mb-2">
                 <span className="text-gray-400">Price per ticket:</span>
@@ -407,7 +425,7 @@ const EventDetailPage = () => {
                     : ticketClass === 'platinum'
                       ? (event.price * 5).toFixed(2)
                       : event.price
-                  } {event.currency}
+                  } {paymentMethod === 'TOKEN' ? 'TOKEN' : event.currency}
                 </span>
               </div>
               <div className="flex justify-between mb-2">
@@ -422,7 +440,7 @@ const EventDetailPage = () => {
                     : ticketClass === 'platinum'
                       ? (event.price * 5 * ticketQuantity).toFixed(2)
                       : (event.price * ticketQuantity).toFixed(2)
-                  } {event.currency}
+                  } {paymentMethod === 'TOKEN' ? 'TOKEN' : event.currency}
                 </span>
               </div>
             </div>
