@@ -169,14 +169,14 @@ const EventsPage = () => {
                   </div>
                   
                   {categories.map((category) => (
-                    <div key={String(category)} className="flex items-center">
+                    <div key={category} className="flex items-center">
                       <Button 
                         variant={selectedCategory === category ? "default" : "outline"}
                         size="sm"
                         className={selectedCategory === category ? "bg-blocktix-purple" : "text-white border-white/20"}
                         onClick={() => setSelectedCategory(category)}
                       >
-                        {String(category)}
+                        {category}
                       </Button>
                     </div>
                   ))}
@@ -213,7 +213,7 @@ const EventsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredEvents.map((event) => (
               <Card 
-                key={String(event.id)} 
+                key={event.id} 
                 className="border border-white/10 bg-blocktix-dark/50 overflow-hidden hover:shadow-lg hover:shadow-blocktix-purple/20 transition-all duration-300"
               >
                 <div className="h-48 overflow-hidden relative">

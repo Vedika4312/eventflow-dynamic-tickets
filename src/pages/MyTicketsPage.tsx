@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -113,8 +114,8 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
-                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        ticketClass={ticket.ticket_class}
+                        status={ticket.status}
                         tokenId={ticket.token_id}
                         qrCode={ticket.qr_code || undefined}
                       />
@@ -144,8 +145,8 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
-                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        ticketClass={ticket.ticket_class}
+                        status={ticket.status}
                         tokenId={ticket.token_id}
                         qrCode={ticket.qr_code || undefined}
                       />
