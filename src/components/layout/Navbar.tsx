@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const Navbar = () => {
+const Navbar: React.FC = () => {
   const { setVisible } = useWalletModal();
   const { connected, publicKey, disconnect, isRegistering } = useWalletIntegration();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
