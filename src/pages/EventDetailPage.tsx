@@ -47,7 +47,7 @@ const EventDetailPage = () => {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('*')
+          .select('*, tickets(count)')
           .eq('id', id)
           .single();
           
@@ -86,6 +86,36 @@ const EventDetailPage = () => {
     };
     
     fetchEvent();
+    
+    // Set up real-time subscription for ticket updates
+    const channel = supabase
+      .channel('events-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets',
+          filter: `event_id=eq.${id}`
+        },
+        async () => {
+          // Refresh event data when tickets change
+          const { data } = await supabase
+            .from('events')
+            .select('*')
+            .eq('id', id)
+            .single();
+          
+          if (data) {
+            setEvent(data);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const handleShare = async () => {
@@ -286,22 +316,26 @@ const EventDetailPage = () => {
                 <div className="mb-6">
                   <div className="flex justify-between mb-2">
                     <span className="text-gray-400">Price:</span>
-                    <span className="font-bold">{event.price} {event.currency}</span>
+                    <span className="font-bold">{event?.price} {event?.currency}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span className="text-gray-400">Available:</span>
-                    <span>{event.totalTickets - event.soldTickets} tickets</span>
+                    <span>{event ? (event.total_tickets - event.sold_tickets) : 0} tickets</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Sold:</span>
-                    <span>{Math.round((event.soldTickets / event.totalTickets) * 100)}%</span>
+                    <span>{event ? Math.round((event.sold_tickets / event.total_tickets) * 100) : 0}%</span>
                   </div>
                 </div>
                 
                 <div className="w-full bg-gray-700 rounded-full h-2.5 mb-6">
                   <div 
                     className="bg-gradient-purple h-2.5 rounded-full" 
-                    style={{ width: `${(event.soldTickets / event.totalTickets) * 100}%` }}
+                    style={{ 
+                      width: event 
+                        ? `${Math.min((event.sold_tickets / event.total_tickets) * 100, 100)}%` 
+                        : '0%' 
+                    }}
                   ></div>
                 </div>
                 
