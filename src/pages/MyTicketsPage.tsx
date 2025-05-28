@@ -27,104 +27,90 @@ interface Ticket {
 }
 
 const MyTicketsPage = () => {
-  const { publicKey } = useWalletIntegration();
+  const { publicKey, connected } = useWalletIntegration();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchTickets = async () => {
-      console.log('Fetching tickets for wallet:', publicKey?.toString());
+      console.log('=== TICKET FETCH START ===');
+      console.log('Connected:', connected);
+      console.log('Public Key:', publicKey?.toString());
       
-      if (!publicKey) {
-        // For users without wallet, try to get tickets from localStorage for free events
-        const localTickets = localStorage.getItem('freeTickets');
-        if (localTickets) {
-          try {
-            const parsedTickets = JSON.parse(localTickets);
-            console.log('Found local free tickets:', parsedTickets);
-            setTickets(parsedTickets);
-          } catch (error) {
-            console.error('Error parsing local tickets:', error);
-            setTickets([]);
-          }
-        } else {
-          setTickets([]);
-        }
-        setLoading(false);
-        return;
-      }
-
+      setLoading(true);
+      setError(null);
+      
       try {
-        // Use a single query with proper join to get tickets with event data
-        const { data: ticketsWithEvents, error } = await supabase
-          .from('tickets')
-          .select(`
-            id,
-            event_id,
-            purchase_price,
-            purchase_currency,
-            token_id,
-            ticket_class,
-            qr_code,
-            status,
-            owner_wallet,
-            events!inner (
-              title,
-              date,
-              location
-            )
-          `)
-          .eq('owner_wallet', publicKey.toString());
+        let allTickets: Ticket[] = [];
 
-        console.log('Database query result:', ticketsWithEvents);
-        console.log('Database query error:', error);
+        // If wallet is connected, fetch from database
+        if (connected && publicKey) {
+          console.log('Fetching tickets from database for wallet:', publicKey.toString());
+          
+          const { data: dbTickets, error: dbError } = await supabase
+            .from('tickets')
+            .select(`
+              id,
+              event_id,
+              purchase_price,
+              purchase_currency,
+              token_id,
+              ticket_class,
+              qr_code,
+              status,
+              owner_wallet,
+              events!inner (
+                title,
+                date,
+                location
+              )
+            `)
+            .eq('owner_wallet', publicKey.toString());
 
-        if (error) {
-          console.error('Error fetching tickets:', error);
-          setTickets([]);
-          setLoading(false);
-          return;
-        }
+          console.log('Database tickets result:', dbTickets);
+          console.log('Database error:', dbError);
 
-        if (!ticketsWithEvents || ticketsWithEvents.length === 0) {
-          console.log('No tickets found for wallet');
-          setTickets([]);
-          setLoading(false);
-          return;
-        }
-
-        // Transform the data to match our interface
-        const transformedTickets = ticketsWithEvents.map(ticket => ({
-          ...ticket,
-          events: Array.isArray(ticket.events) ? ticket.events[0] : ticket.events
-        }));
-        
-        console.log('Transformed tickets:', transformedTickets);
-        setTickets(transformedTickets);
-
-        // Also check for any free tickets in localStorage and merge them
-        const localTickets = localStorage.getItem('freeTickets');
-        if (localTickets) {
-          try {
-            const parsedLocalTickets = JSON.parse(localTickets);
-            const mergedTickets = [...transformedTickets, ...parsedLocalTickets];
-            console.log('Merged tickets with local free tickets:', mergedTickets);
-            setTickets(mergedTickets);
-          } catch (error) {
-            console.error('Error parsing local tickets:', error);
+          if (dbError) {
+            console.error('Database error:', dbError);
+            setError(`Database error: ${dbError.message}`);
+          } else if (dbTickets && dbTickets.length > 0) {
+            // Transform database tickets
+            const transformedDbTickets = dbTickets.map(ticket => ({
+              ...ticket,
+              events: Array.isArray(ticket.events) ? ticket.events[0] : ticket.events
+            }));
+            allTickets = [...allTickets, ...transformedDbTickets];
+            console.log('Added database tickets:', transformedDbTickets);
           }
         }
 
-      } catch (error) {
-        console.error('Error fetching tickets:', error);
-        setTickets([]);
+        // Always check for localStorage tickets (for free events)
+        const localTicketsStr = localStorage.getItem('freeTickets');
+        if (localTicketsStr) {
+          try {
+            const localTickets = JSON.parse(localTicketsStr);
+            console.log('Found local tickets:', localTickets);
+            allTickets = [...allTickets, ...localTickets];
+          } catch (parseError) {
+            console.error('Error parsing localStorage tickets:', parseError);
+          }
+        }
+
+        console.log('Final all tickets:', allTickets);
+        setTickets(allTickets);
+
+      } catch (fetchError) {
+        console.error('Fetch error:', fetchError);
+        setError(`Failed to fetch tickets: ${fetchError}`);
       } finally {
         setLoading(false);
+        console.log('=== TICKET FETCH END ===');
       }
     };
     
     fetchTickets();
-  }, [publicKey]);
+  }, [connected, publicKey]);
 
   // Helper function to determine if an event is upcoming or past
   const isUpcomingEvent = (eventDate: string) => {
@@ -142,9 +128,8 @@ const MyTicketsPage = () => {
     ticket.events?.date ? !isUpcomingEvent(ticket.events.date) : false
   );
 
-  console.log('All tickets:', tickets);
-  console.log('Upcoming tickets:', upcomingTickets);
-  console.log('Past tickets:', pastTickets);
+  console.log('FILTERED - Upcoming:', upcomingTickets.length, upcomingTickets);
+  console.log('FILTERED - Past:', pastTickets.length, pastTickets);
 
   if (loading) {
     return (
@@ -159,13 +144,38 @@ const MyTicketsPage = () => {
     );
   }
 
+  if (error) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12 bg-red-900/20 rounded-lg border border-red-500/20">
+            <h3 className="text-xl font-medium mb-2 text-red-400">Error Loading Tickets</h3>
+            <p className="text-gray-400 mb-6">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-2">My Tickets</h1>
         <p className="text-gray-400 mb-8">Manage your NFT tickets and collectibles</p>
         
-        {!publicKey ? (
+        {/* Debug info - remove in production */}
+        <div className="mb-4 p-4 bg-gray-800 rounded text-sm">
+          <p>Connected: {connected ? 'Yes' : 'No'}</p>
+          <p>Wallet: {publicKey?.toString() || 'None'}</p>
+          <p>Total Tickets: {tickets.length}</p>
+          <p>Upcoming: {upcomingTickets.length}</p>
+          <p>Past: {pastTickets.length}</p>
+        </div>
+        
+        {!connected ? (
           <div className="space-y-6">
             <div className="text-center py-8 bg-blocktix-dark/50 rounded-lg border border-white/10">
               <h3 className="text-lg font-medium mb-2">Limited Access</h3>
@@ -179,7 +189,7 @@ const MyTicketsPage = () => {
             
             {tickets.length > 0 ? (
               <div>
-                <h3 className="text-xl font-semibold mb-4">Free Tickets</h3>
+                <h3 className="text-xl font-semibold mb-4">Free Tickets ({tickets.length})</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {tickets.map((ticket) => (
                     <div key={ticket.id} className="h-[400px]">
