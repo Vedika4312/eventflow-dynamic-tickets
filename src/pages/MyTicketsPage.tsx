@@ -79,9 +79,21 @@ const MyTicketsPage = () => {
     fetchTickets();
   }, [publicKey]);
 
-  // Filter tickets by status
-  const upcomingTickets = tickets.filter(ticket => ticket.status === 'upcoming');
-  const usedTickets = tickets.filter(ticket => ticket.status === 'used' || ticket.status === 'expired');
+  // Helper function to determine if an event is upcoming or past
+  const isUpcomingEvent = (eventDate: string) => {
+    const now = new Date();
+    const eventDateTime = new Date(eventDate);
+    return eventDateTime > now;
+  };
+
+  // Filter tickets by event date instead of status
+  const upcomingTickets = tickets.filter(ticket => 
+    ticket.event?.date ? isUpcomingEvent(ticket.event.date) : false
+  );
+  
+  const pastTickets = tickets.filter(ticket => 
+    ticket.event?.date ? !isUpcomingEvent(ticket.event.date) : false
+  );
 
   if (loading) {
     return (
@@ -124,10 +136,10 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Free Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location TBD"}
-                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
-                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
+                        status="upcoming"
                         tokenId={ticket.token_id}
-                        qrCode={ticket.qr_code || undefined}
+                        qrCode={ticket.qr_code || `https://blocktix-qr.vercel.app/ticket/${ticket.id}`}
                       />
                     </div>
                   ))}
@@ -149,8 +161,12 @@ const MyTicketsPage = () => {
         ) : (
           <Tabs defaultValue="upcoming" className="w-full">
             <TabsList className="mb-6">
-              <TabsTrigger value="upcoming">Upcoming Events</TabsTrigger>
-              <TabsTrigger value="past">Past Events</TabsTrigger>
+              <TabsTrigger value="upcoming">
+                Upcoming Events ({upcomingTickets.length})
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Past Events ({pastTickets.length})
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="upcoming">
@@ -162,10 +178,10 @@ const MyTicketsPage = () => {
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
-                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
+                        status="upcoming"
                         tokenId={ticket.token_id}
-                        qrCode={ticket.qr_code || undefined}
+                        qrCode={ticket.qr_code || `https://blocktix-qr.vercel.app/ticket/${ticket.id}`}
                       />
                     </div>
                   ))}
@@ -185,18 +201,18 @@ const MyTicketsPage = () => {
             </TabsContent>
             
             <TabsContent value="past">
-              {usedTickets.length > 0 ? (
+              {pastTickets.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {usedTickets.map((ticket) => (
+                  {pastTickets.map((ticket) => (
                     <div key={ticket.id} className="h-[400px]">
                       <DynamicTicket
                         eventTitle={ticket.event?.title || "Untitled Event"}
                         eventDate={ticket.event?.date || new Date().toISOString()}
                         eventLocation={ticket.event?.location || "Location Unknown"}
-                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
-                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
+                        status="expired"
                         tokenId={ticket.token_id}
-                        qrCode={ticket.qr_code || undefined}
+                        qrCode={ticket.qr_code || `https://blocktix-qr.vercel.app/ticket/${ticket.id}`}
                       />
                     </div>
                   ))}
