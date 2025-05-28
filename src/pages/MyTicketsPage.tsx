@@ -19,7 +19,7 @@ interface Ticket {
   qr_code: string | null;
   status: string;
   owner_wallet: string;
-  event?: {
+  events?: {
     title: string;
     date: string;
     location: string;
@@ -33,12 +33,15 @@ const MyTicketsPage = () => {
   
   useEffect(() => {
     const fetchTickets = async () => {
+      console.log('Fetching tickets for wallet:', publicKey?.toString());
+      
       if (!publicKey) {
         // For users without wallet, try to get tickets from localStorage for free events
         const localTickets = localStorage.getItem('freeTickets');
         if (localTickets) {
           try {
             const parsedTickets = JSON.parse(localTickets);
+            console.log('Found local free tickets:', parsedTickets);
             setTickets(parsedTickets);
           } catch (error) {
             console.error('Error parsing local tickets:', error);
@@ -52,25 +55,50 @@ const MyTicketsPage = () => {
       }
 
       try {
-        const { data, error } = await supabase
+        // First, let's try a simpler query to see what tickets exist
+        const { data: allTickets, error: ticketsError } = await supabase
           .from('tickets')
-          .select(`
-            *,
-            event:event_id (
-              title, 
-              date, 
-              location
-            )
-          `)
+          .select('*')
           .eq('owner_wallet', publicKey.toString());
           
-        if (error) throw error;
+        console.log('Raw tickets query result:', allTickets);
+        console.log('Tickets query error:', ticketsError);
         
-        if (data) {
-          setTickets(data);
+        if (ticketsError) {
+          console.error('Error fetching tickets:', ticketsError);
+          setTickets([]);
+          setLoading(false);
+          return;
         }
+
+        if (!allTickets || allTickets.length === 0) {
+          console.log('No tickets found for wallet');
+          setTickets([]);
+          setLoading(false);
+          return;
+        }
+
+        // Now fetch the events data separately
+        const eventIds = allTickets.map(ticket => ticket.event_id);
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('events')
+          .select('id, title, date, location')
+          .in('id', eventIds);
+          
+        console.log('Events data:', eventsData);
+        console.log('Events error:', eventsError);
+
+        // Combine tickets with event data
+        const ticketsWithEvents = allTickets.map(ticket => ({
+          ...ticket,
+          events: eventsData?.find(event => event.id === ticket.event_id)
+        }));
+        
+        console.log('Final tickets with events:', ticketsWithEvents);
+        setTickets(ticketsWithEvents);
       } catch (error) {
         console.error('Error fetching tickets:', error);
+        setTickets([]);
       } finally {
         setLoading(false);
       }
@@ -88,12 +116,15 @@ const MyTicketsPage = () => {
 
   // Filter tickets by event date instead of status
   const upcomingTickets = tickets.filter(ticket => 
-    ticket.event?.date ? isUpcomingEvent(ticket.event.date) : false
+    ticket.events?.date ? isUpcomingEvent(ticket.events.date) : true // Default to upcoming if no date
   );
   
   const pastTickets = tickets.filter(ticket => 
-    ticket.event?.date ? !isUpcomingEvent(ticket.event.date) : false
+    ticket.events?.date ? !isUpcomingEvent(ticket.events.date) : false
   );
+
+  console.log('Upcoming tickets:', upcomingTickets);
+  console.log('Past tickets:', pastTickets);
 
   if (loading) {
     return (
@@ -133,9 +164,9 @@ const MyTicketsPage = () => {
                   {tickets.map((ticket) => (
                     <div key={ticket.id} className="h-[400px]">
                       <DynamicTicket
-                        eventTitle={ticket.event?.title || "Free Event"}
-                        eventDate={ticket.event?.date || new Date().toISOString()}
-                        eventLocation={ticket.event?.location || "Location TBD"}
+                        eventTitle={ticket.events?.title || "Free Event"}
+                        eventDate={ticket.events?.date || new Date().toISOString()}
+                        eventLocation={ticket.events?.location || "Location TBD"}
                         ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
                         status="upcoming"
                         tokenId={ticket.token_id}
@@ -175,9 +206,9 @@ const MyTicketsPage = () => {
                   {upcomingTickets.map((ticket) => (
                     <div key={ticket.id} className="h-[400px]">
                       <DynamicTicket
-                        eventTitle={ticket.event?.title || "Untitled Event"}
-                        eventDate={ticket.event?.date || new Date().toISOString()}
-                        eventLocation={ticket.event?.location || "Location Unknown"}
+                        eventTitle={ticket.events?.title || "Untitled Event"}
+                        eventDate={ticket.events?.date || new Date().toISOString()}
+                        eventLocation={ticket.events?.location || "Location Unknown"}
                         ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
                         status="upcoming"
                         tokenId={ticket.token_id}
@@ -206,9 +237,9 @@ const MyTicketsPage = () => {
                   {pastTickets.map((ticket) => (
                     <div key={ticket.id} className="h-[400px]">
                       <DynamicTicket
-                        eventTitle={ticket.event?.title || "Untitled Event"}
-                        eventDate={ticket.event?.date || new Date().toISOString()}
-                        eventLocation={ticket.event?.location || "Location Unknown"}
+                        eventTitle={ticket.events?.title || "Untitled Event"}
+                        eventDate={ticket.events?.date || new Date().toISOString()}
+                        eventLocation={ticket.events?.location || "Location Unknown"}
                         ticketClass={(ticket.ticket_class.toLowerCase() as "general" | "vip" | "platinum")}
                         status="expired"
                         tokenId={ticket.token_id}

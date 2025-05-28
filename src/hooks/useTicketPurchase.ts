@@ -179,43 +179,95 @@ export const useTicketPurchase = (eventId: string) => {
         const ticketId = uuidv4();
         const qrCode = `https://blocktix-qr.vercel.app/ticket/${ticketId}`;
         
-        tickets.push({
+        const ticket = {
           id: ticketId,
           event_id: eventId,
-          owner_wallet: publicKey ? publicKey.toString() : "free-user", // Handle free events differently
+          owner_wallet: publicKey ? publicKey.toString() : "free-user",
           purchase_price: isFree ? 0 : eventData.price * priceMultiplier,
           purchase_currency: isFree ? 'FREE' : (paymentMethod === 'MONAD' ? 'MONAD' : 
                              paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency),
           token_id: `${isFree ? 'FREE' : paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
           ticket_class: ticketClass.toUpperCase(),
-          qr_code: qrCode
-        });
+          qr_code: qrCode,
+          status: 'upcoming'
+        };
+        
+        tickets.push(ticket);
       }
 
-      try {
-        // Only insert to database for valid UUIDs (real events)
-        if (isValidUuid) {
-          // Insert tickets to database
-          const { error: ticketError } = await supabase
-            .from('tickets')
-            .insert(tickets);
+      console.log('Generated tickets:', tickets);
 
-          if (ticketError) throw ticketError;
+      try {
+        // For free events without wallet, store in localStorage
+        if (isFree && !publicKey) {
+          const existingLocalTickets = localStorage.getItem('freeTickets');
+          let localTickets = [];
+          
+          if (existingLocalTickets) {
+            try {
+              localTickets = JSON.parse(existingLocalTickets);
+            } catch (error) {
+              console.error('Error parsing existing local tickets:', error);
+              localTickets = [];
+            }
+          }
+          
+          // Add event data to tickets for localStorage
+          const ticketsWithEventData = tickets.map(ticket => ({
+            ...ticket,
+            events: {
+              title: event.title,
+              date: event.date,
+              location: event.location
+            }
+          }));
+          
+          localTickets.push(...ticketsWithEventData);
+          localStorage.setItem('freeTickets', JSON.stringify(localTickets));
+          console.log('Saved free tickets to localStorage:', localTickets);
+        }
+        
+        // Only insert to database for valid UUIDs (real events) and when we have a wallet
+        if (isValidUuid) {
+          console.log('Inserting tickets to database:', tickets);
+          
+          // Insert tickets to database
+          const { data: insertedTickets, error: ticketError } = await supabase
+            .from('tickets')
+            .insert(tickets)
+            .select();
+
+          if (ticketError) {
+            console.error('Database error inserting tickets:', ticketError);
+            throw ticketError;
+          }
+          
+          console.log('Successfully inserted tickets:', insertedTickets);
           
           // Update event sold tickets count
-          await supabase
+          const { error: updateError } = await supabase
             .from('events')
             .update({ sold_tickets: event.sold_tickets + quantity })
             .eq('id', eventId);
+            
+          if (updateError) {
+            console.error('Error updating sold tickets:', updateError);
+          }
 
           // Record the purchase interaction
-          await supabase
-            .from('user_events')
-            .insert({
-              user_wallet: publicKey ? publicKey.toString() : "free-user",
-              event_id: eventId,
-              interaction_type: 'purchased'
-            });
+          if (publicKey) {
+            const { error: interactionError } = await supabase
+              .from('user_events')
+              .insert({
+                user_wallet: publicKey.toString(),
+                event_id: eventId,
+                interaction_type: 'purchased'
+              });
+              
+            if (interactionError) {
+              console.error('Error recording interaction:', interactionError);
+            }
+          }
         }
         
         if (!isFree) {
