@@ -55,47 +55,66 @@ const MyTicketsPage = () => {
       }
 
       try {
-        // First, let's try a simpler query to see what tickets exist
-        const { data: allTickets, error: ticketsError } = await supabase
+        // Use a single query with proper join to get tickets with event data
+        const { data: ticketsWithEvents, error } = await supabase
           .from('tickets')
-          .select('*')
+          .select(`
+            id,
+            event_id,
+            purchase_price,
+            purchase_currency,
+            token_id,
+            ticket_class,
+            qr_code,
+            status,
+            owner_wallet,
+            events!inner (
+              title,
+              date,
+              location
+            )
+          `)
           .eq('owner_wallet', publicKey.toString());
-          
-        console.log('Raw tickets query result:', allTickets);
-        console.log('Tickets query error:', ticketsError);
-        
-        if (ticketsError) {
-          console.error('Error fetching tickets:', ticketsError);
+
+        console.log('Database query result:', ticketsWithEvents);
+        console.log('Database query error:', error);
+
+        if (error) {
+          console.error('Error fetching tickets:', error);
           setTickets([]);
           setLoading(false);
           return;
         }
 
-        if (!allTickets || allTickets.length === 0) {
+        if (!ticketsWithEvents || ticketsWithEvents.length === 0) {
           console.log('No tickets found for wallet');
           setTickets([]);
           setLoading(false);
           return;
         }
 
-        // Now fetch the events data separately
-        const eventIds = allTickets.map(ticket => ticket.event_id);
-        const { data: eventsData, error: eventsError } = await supabase
-          .from('events')
-          .select('id, title, date, location')
-          .in('id', eventIds);
-          
-        console.log('Events data:', eventsData);
-        console.log('Events error:', eventsError);
-
-        // Combine tickets with event data
-        const ticketsWithEvents = allTickets.map(ticket => ({
+        // Transform the data to match our interface
+        const transformedTickets = ticketsWithEvents.map(ticket => ({
           ...ticket,
-          events: eventsData?.find(event => event.id === ticket.event_id)
+          events: Array.isArray(ticket.events) ? ticket.events[0] : ticket.events
         }));
         
-        console.log('Final tickets with events:', ticketsWithEvents);
-        setTickets(ticketsWithEvents);
+        console.log('Transformed tickets:', transformedTickets);
+        setTickets(transformedTickets);
+
+        // Also check for any free tickets in localStorage and merge them
+        const localTickets = localStorage.getItem('freeTickets');
+        if (localTickets) {
+          try {
+            const parsedLocalTickets = JSON.parse(localTickets);
+            const mergedTickets = [...transformedTickets, ...parsedLocalTickets];
+            console.log('Merged tickets with local free tickets:', mergedTickets);
+            setTickets(mergedTickets);
+          } catch (error) {
+            console.error('Error parsing local tickets:', error);
+          }
+        }
+
       } catch (error) {
         console.error('Error fetching tickets:', error);
         setTickets([]);
@@ -114,15 +133,16 @@ const MyTicketsPage = () => {
     return eventDateTime > now;
   };
 
-  // Filter tickets by event date instead of status
+  // Filter tickets by event date
   const upcomingTickets = tickets.filter(ticket => 
-    ticket.events?.date ? isUpcomingEvent(ticket.events.date) : true // Default to upcoming if no date
+    ticket.events?.date ? isUpcomingEvent(ticket.events.date) : true
   );
   
   const pastTickets = tickets.filter(ticket => 
     ticket.events?.date ? !isUpcomingEvent(ticket.events.date) : false
   );
 
+  console.log('All tickets:', tickets);
   console.log('Upcoming tickets:', upcomingTickets);
   console.log('Past tickets:', pastTickets);
 
