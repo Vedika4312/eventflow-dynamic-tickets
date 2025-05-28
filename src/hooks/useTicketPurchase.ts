@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { 
@@ -27,7 +28,10 @@ export const useTicketPurchase = (eventId: string) => {
     ticketClass: 'general' | 'vip' | 'platinum' = 'general',
     paymentMethod: 'SOL' | 'TOKEN' | 'MONAD' = 'SOL'
   ) => {
-    if (!publicKey && paymentMethod !== 'MONAD') {
+    // For free events, don't require wallet connection for non-blockchain payments
+    const isFreeEvent = event.price === 0 || event.price === '0';
+    
+    if (!publicKey && !isFreeEvent) {
       toast.error("Wallet not connected", {
         description: "Please connect your wallet to purchase tickets"
       });
@@ -40,7 +44,6 @@ export const useTicketPurchase = (eventId: string) => {
       // Check if eventId is a valid UUID
       let isValidUuid = true;
       try {
-        // Simple pattern to check if it's a UUID
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         isValidUuid = uuidPattern.test(eventId);
       } catch(err) {
@@ -62,7 +65,7 @@ export const useTicketPurchase = (eventId: string) => {
       } else {
         // For mock events or non-UUID IDs
         eventData = {
-          organizer_wallet: event.organizer_wallet || "8YUNPvWkKvTajZGEVSmGzh1mTKXzFLCwvKrYLZQ5iT1H", // Default demo wallet
+          organizer_wallet: event.organizer_wallet || "8YUNPvWkKvTajZGEVSmGzh1mTKXzFLCwvKrYLZQ5iT1H",
           price: event.price,
           currency: event.currency || "SOL"
         };
@@ -82,12 +85,27 @@ export const useTicketPurchase = (eventId: string) => {
       }
 
       const totalPrice = eventData.price * quantity * priceMultiplier;
+      const isFree = totalPrice === 0;
 
       // Handle payment based on selected method
       let paymentSuccess = false;
       
-      if (paymentMethod === 'SOL') {
+      if (isFree) {
+        // For free events, no payment processing needed
+        paymentSuccess = true;
+        toast.success("Free ticket claimed!", {
+          description: `You have successfully claimed ${quantity} free ticket${quantity > 1 ? 's' : ''}`
+        });
+      } else if (paymentMethod === 'SOL') {
         // For SOL transactions (existing code)
+        if (!publicKey) {
+          toast.error("Wallet not connected", {
+            description: "Please connect your wallet to purchase paid tickets"
+          });
+          setIsProcessing(false);
+          return false;
+        }
+
         const connection = new Connection(
           clusterApiUrl(WalletAdapterNetwork.Devnet), 
           'confirmed'
@@ -133,22 +151,18 @@ export const useTicketPurchase = (eventId: string) => {
         paymentSuccess = true;
       } else if (paymentMethod === 'TOKEN') {
         // Placeholder for token transactions
-        // In a production app, this would integrate with token transfer logic
         console.log("Token payment selected - would process token transfer here");
         
-        // Simulate a successful token transaction for demo purposes
         toast.info("Token payment simulation", {
           description: "In a production app, this would process a real token transfer"
         });
         
-        // Add a slight delay to simulate processing
         await new Promise(resolve => setTimeout(resolve, 1000));
         paymentSuccess = true;
       } else if (paymentMethod === 'MONAD') {
         // For Monad blockchain payments
-        const monadWalletAddress = eventData.organizer_monad_wallet || "0x1234567890123456789012345678901234567890"; // Default demo Monad wallet
+        const monadWalletAddress = eventData.organizer_monad_wallet || "0x1234567890123456789012345678901234567890";
         
-        // Process payment directly via Monad using existing wallet
         paymentSuccess = await processMonadPayment(monadWalletAddress, totalPrice);
       } else {
         throw new Error("Unsupported payment method");
@@ -168,11 +182,11 @@ export const useTicketPurchase = (eventId: string) => {
         tickets.push({
           id: ticketId,
           event_id: eventId,
-          owner_wallet: publicKey ? publicKey.toString() : "monad-user", // Handle Monad users differently
-          purchase_price: eventData.price * priceMultiplier,
-          purchase_currency: paymentMethod === 'MONAD' ? 'MONAD' : 
-                             paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency,
-          token_id: `${paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
+          owner_wallet: publicKey ? publicKey.toString() : "free-user", // Handle free events differently
+          purchase_price: isFree ? 0 : eventData.price * priceMultiplier,
+          purchase_currency: isFree ? 'FREE' : (paymentMethod === 'MONAD' ? 'MONAD' : 
+                             paymentMethod === 'TOKEN' ? 'TOKEN' : eventData.currency),
+          token_id: `${isFree ? 'FREE' : paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
           ticket_class: ticketClass.toUpperCase(),
           qr_code: qrCode
         });
@@ -198,24 +212,28 @@ export const useTicketPurchase = (eventId: string) => {
           await supabase
             .from('user_events')
             .insert({
-              user_wallet: publicKey ? publicKey.toString() : "monad-user", // Handle Monad users differently
+              user_wallet: publicKey ? publicKey.toString() : "free-user",
               event_id: eventId,
               interaction_type: 'purchased'
             });
         }
         
-        toast.success("Purchase successful!", {
-          description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
-        });
+        if (!isFree) {
+          toast.success("Purchase successful!", {
+            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
+          });
+        }
         
         setIsProcessing(false);
         return true;
       } catch (dbError) {
-        console.error("Database operation failed but blockchain transaction succeeded:", dbError);
-        // Still return true since the blockchain transaction was successful
-        toast.success("Purchase successful!", {
-          description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
-        });
+        console.error("Database operation failed but payment transaction succeeded:", dbError);
+        // Still return true since the payment transaction was successful
+        if (!isFree) {
+          toast.success("Purchase successful!", {
+            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
+          });
+        }
         setIsProcessing(false);
         return true;
       }

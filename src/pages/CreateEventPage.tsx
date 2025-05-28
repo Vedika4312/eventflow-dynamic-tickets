@@ -1,10 +1,11 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Calendar, Clock, MapPin, Upload, TicketIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +25,8 @@ const CreateEventPage = () => {
     currency: 'SOL',
     totalTickets: '',
     royaltyPercentage: '5',
-    resellable: 'true'
+    resellable: 'true',
+    paymentType: 'paid' // 'free' or 'paid'
   });
   
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -44,6 +46,14 @@ const CreateEventPage = () => {
   
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePaymentTypeChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      paymentType: value,
+      price: value === 'free' ? '0' : prev.price
+    }));
   };
 
   const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,10 +99,20 @@ const CreateEventPage = () => {
     
     // Basic validation
     if (!formData.title || !formData.description || !formData.date || !formData.time || 
-        !formData.location || !formData.category || !formData.price || !formData.totalTickets) {
+        !formData.location || !formData.category || !formData.totalTickets) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate price for paid events
+    if (formData.paymentType === 'paid' && (!formData.price || parseFloat(formData.price) <= 0)) {
+      toast({
+        title: "Invalid price",
+        description: "Please set a valid price for paid events",
         variant: "destructive"
       });
       return;
@@ -224,44 +244,89 @@ const CreateEventPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Payment Type Selection */}
+              <div>
+                <label className="block text-sm font-medium mb-4">Payment Type</label>
+                <RadioGroup 
+                  value={formData.paymentType} 
+                  onValueChange={handlePaymentTypeChange}
+                  className="flex gap-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="free" id="free" />
+                    <Label htmlFor="free" className="text-sm">Free Event</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="paid" id="paid" />
+                    <Label htmlFor="paid" className="text-sm">Paid Event</Label>
+                  </div>
+                </RadioGroup>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" htmlFor="price">
-                    Ticket Price
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">Ⓢ</span>
-                    <Input 
-                      id="price"
-                      name="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      placeholder="0.00"
-                      className="bg-blocktix-dark/50 border-white/10 pl-10"
-                      required
-                    />
+              {/* Pricing Section - Only show for paid events */}
+              {formData.paymentType === 'paid' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2" htmlFor="price">
+                      Ticket Price
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">Ⓢ</span>
+                      <Input 
+                        id="price"
+                        name="price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price}
+                        onChange={handleInputChange}
+                        placeholder="0.00"
+                        className="bg-blocktix-dark/50 border-white/10 pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2" htmlFor="currency">
+                      Currency
+                    </label>
+                    <Select name="currency" defaultValue="SOL" onValueChange={(value) => handleSelectChange('currency', value)}>
+                      <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
+                        <SelectValue placeholder="SOL" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SOL">SOL</SelectItem>
+                        <SelectItem value="USDC">USDC</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2" htmlFor="totalTickets">
+                      Total Tickets
+                    </label>
+                    <div className="relative">
+                      <TicketIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input 
+                        id="totalTickets"
+                        name="totalTickets"
+                        type="number"
+                        min="1"
+                        value={formData.totalTickets}
+                        onChange={handleInputChange}
+                        placeholder="100"
+                        className="bg-blocktix-dark/50 border-white/10 pl-10"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2" htmlFor="currency">
-                    Currency
-                  </label>
-                  <Select name="currency" defaultValue="SOL" onValueChange={(value) => handleSelectChange('currency', value)}>
-                    <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
-                      <SelectValue placeholder="SOL" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="SOL">SOL</SelectItem>
-                      <SelectItem value="USDC">USDC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
+              )}
+
+              {/* Total Tickets for Free Events */}
+              {formData.paymentType === 'free' && (
                 <div>
                   <label className="block text-sm font-medium mb-2" htmlFor="totalTickets">
                     Total Tickets
@@ -281,45 +346,48 @@ const CreateEventPage = () => {
                     />
                   </div>
                 </div>
-              </div>
+              )}
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" htmlFor="royaltyPercentage">
-                    Resale Royalty %
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">%</span>
-                    <Input 
-                      id="royaltyPercentage"
-                      name="royaltyPercentage"
-                      type="number"
-                      min="0"
-                      max="15"
-                      value={formData.royaltyPercentage}
-                      onChange={handleInputChange}
-                      placeholder="5"
-                      className="bg-blocktix-dark/50 border-white/10 pl-10"
-                      required
-                    />
+              {/* Only show resale options for paid events */}
+              {formData.paymentType === 'paid' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2" htmlFor="royaltyPercentage">
+                      Resale Royalty %
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">%</span>
+                      <Input 
+                        id="royaltyPercentage"
+                        name="royaltyPercentage"
+                        type="number"
+                        min="0"
+                        max="15"
+                        value={formData.royaltyPercentage}
+                        onChange={handleInputChange}
+                        placeholder="5"
+                        className="bg-blocktix-dark/50 border-white/10 pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2" htmlFor="resellable">
+                      Allow Reselling
+                    </label>
+                    <Select name="resellable" defaultValue="true" onValueChange={(value) => handleSelectChange('resellable', value)}>
+                      <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
+                        <SelectValue placeholder="Yes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2" htmlFor="resellable">
-                    Allow Reselling
-                  </label>
-                  <Select name="resellable" defaultValue="true" onValueChange={(value) => handleSelectChange('resellable', value)}>
-                    <SelectTrigger className="bg-blocktix-dark/50 border-white/10">
-                      <SelectValue placeholder="Yes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Yes</SelectItem>
-                      <SelectItem value="false">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              )}
               
               <div className="pt-4">
                 <Button 

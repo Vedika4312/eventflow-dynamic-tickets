@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -33,7 +34,19 @@ const MyTicketsPage = () => {
   useEffect(() => {
     const fetchTickets = async () => {
       if (!publicKey) {
-        setTickets([]);
+        // For users without wallet, try to get tickets from localStorage for free events
+        const localTickets = localStorage.getItem('freeTickets');
+        if (localTickets) {
+          try {
+            const parsedTickets = JSON.parse(localTickets);
+            setTickets(parsedTickets);
+          } catch (error) {
+            console.error('Error parsing local tickets:', error);
+            setTickets([]);
+          }
+        } else {
+          setTickets([]);
+        }
         setLoading(false);
         return;
       }
@@ -90,12 +103,48 @@ const MyTicketsPage = () => {
         <p className="text-gray-400 mb-8">Manage your NFT tickets and collectibles</p>
         
         {!publicKey ? (
-          <div className="text-center py-12 bg-blocktix-dark/50 rounded-lg border border-white/10">
-            <h3 className="text-xl font-medium mb-4">Wallet Not Connected</h3>
-            <p className="text-gray-400 mb-6">Please connect your wallet to view your tickets</p>
-            <Button variant="default" className="bg-gradient-purple hover:opacity-90">
-              Connect Wallet
-            </Button>
+          <div className="space-y-6">
+            <div className="text-center py-8 bg-blocktix-dark/50 rounded-lg border border-white/10">
+              <h3 className="text-lg font-medium mb-2">Limited Access</h3>
+              <p className="text-gray-400 mb-4">
+                You can view free tickets claimed without a wallet, but connecting your wallet will give you access to all features.
+              </p>
+              <Button variant="default" className="bg-gradient-purple hover:opacity-90">
+                Connect Wallet for Full Access
+              </Button>
+            </div>
+            
+            {tickets.length > 0 ? (
+              <div>
+                <h3 className="text-xl font-semibold mb-4">Free Tickets</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {tickets.map((ticket) => (
+                    <div key={ticket.id} className="h-[400px]">
+                      <DynamicTicket
+                        eventTitle={ticket.event?.title || "Free Event"}
+                        eventDate={ticket.event?.date || new Date().toISOString()}
+                        eventLocation={ticket.event?.location || "Location TBD"}
+                        ticketClass={(ticket.ticket_class as "general" | "vip" | "platinum")}
+                        status={(ticket.status as "upcoming" | "active" | "used" | "expired")}
+                        tokenId={ticket.token_id}
+                        qrCode={ticket.qr_code || undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-blocktix-dark/50 rounded-lg border border-white/10">
+                <h3 className="text-xl font-medium mb-2">No tickets found</h3>
+                <p className="text-gray-400 mb-6">You haven't claimed any free tickets yet</p>
+                <Button asChild>
+                  <Link to="/events">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Browse Events
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <Tabs defaultValue="upcoming" className="w-full">
