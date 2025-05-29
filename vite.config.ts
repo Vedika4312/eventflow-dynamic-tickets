@@ -43,4 +43,12 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
+  build: {
+    target: 'esnext', // Support modern JavaScript features including top-level await
+    rollupOptions: {
+      output: {
+        format: 'es',
+      },
+    },
+  },
 }));
