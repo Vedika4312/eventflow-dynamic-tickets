@@ -178,7 +178,7 @@ export const useTicketPurchase = (eventId: string) => {
         return false;
       }
 
-      // Generate ticket records
+      // Generate ticket records with QR codes
       const tickets = [];
       for (let i = 0; i < quantity; i++) {
         const ticketId = uuidv4();
@@ -201,7 +201,7 @@ export const useTicketPurchase = (eventId: string) => {
         tickets.push(ticket);
       }
 
-      console.log('Generated tickets:', tickets);
+      console.log('Generated tickets with QR codes:', tickets);
 
       try {
         if (isFree && !publicKey) {
@@ -272,7 +272,7 @@ export const useTicketPurchase = (eventId: string) => {
         
         if (!isFree) {
           toast.success("Purchase successful!", {
-            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
+            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''} with QR codes`
           });
         }
         
@@ -282,7 +282,7 @@ export const useTicketPurchase = (eventId: string) => {
         console.error("Database operation failed but payment transaction succeeded:", dbError);
         if (!isFree) {
           toast.success("Purchase successful!", {
-            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`
+            description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''} with QR codes`
           });
         }
         setIsProcessing(false);

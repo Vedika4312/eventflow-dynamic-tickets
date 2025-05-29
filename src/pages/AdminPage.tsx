@@ -22,6 +22,7 @@ interface Ticket {
   ticket_class: string;
   token_id: string;
   status: string;
+  qr_code: string;
   events: {
     title: string;
     date: string;
@@ -43,6 +44,7 @@ interface AttendanceRecord {
   tickets: {
     token_id: string;
     owner_wallet: string;
+    qr_code: string;
     events: {
       title: string;
       date: string;
@@ -89,6 +91,7 @@ const AdminPage = () => {
           tickets (
             token_id,
             owner_wallet,
+            qr_code,
             events (title, date)
           )
         `)
@@ -307,6 +310,7 @@ const AdminPage = () => {
                       <TableHead>Class</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>QR Code</TableHead>
                       <TableHead>Attendance</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -337,6 +341,20 @@ const AdminPage = () => {
                           <Badge variant={ticket.status === 'upcoming' ? 'default' : 'secondary'}>
                             {ticket.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {ticket.qr_code && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(ticket.qr_code);
+                                toast.success('QR code URL copied');
+                              }}
+                            >
+                              Copy QR
+                            </Button>
+                          )}
                         </TableCell>
                         <TableCell>
                           {ticket.attendance && ticket.attendance.length > 0 ? (
@@ -371,6 +389,7 @@ const AdminPage = () => {
                       <TableHead>Event</TableHead>
                       <TableHead>Ticket ID</TableHead>
                       <TableHead>Owner</TableHead>
+                      <TableHead>QR Code</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Scanned By</TableHead>
                     </TableRow>
@@ -394,6 +413,20 @@ const AdminPage = () => {
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {record.tickets?.owner_wallet.substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>
+                          {record.tickets?.qr_code && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(record.tickets.qr_code);
+                                toast.success('QR code URL copied');
+                              }}
+                            >
+                              Copy QR
+                            </Button>
+                          )}
                         </TableCell>
                         <TableCell>{record.location || 'N/A'}</TableCell>
                         <TableCell className="font-mono text-xs">
