@@ -28,7 +28,6 @@ export const useTicketPurchase = (eventId: string) => {
     ticketClass: 'general' | 'vip' | 'platinum' = 'general',
     paymentMethod: 'SOL' | 'TOKEN' | 'MONAD' = 'SOL'
   ) => {
-    // For free events, don't require wallet connection for non-blockchain payments
     const isFreeEvent = event.price === 0 || event.price === '0';
     
     if (!publicKey && !isFreeEvent) {
@@ -50,10 +49,28 @@ export const useTicketPurchase = (eventId: string) => {
         isValidUuid = false;
       }
 
+      // For free events, check if user already has a free ticket for this event
+      if (isFreeEvent && publicKey && isValidUuid) {
+        const { data: hasExistingTicket, error: checkError } = await supabase
+          .rpc('check_free_ticket_exists', {
+            user_wallet_addr: publicKey.toString(),
+            event_uuid: eventId
+          });
+
+        if (checkError) {
+          console.error('Error checking existing free tickets:', checkError);
+        } else if (hasExistingTicket) {
+          toast.error("Already claimed", {
+            description: "You have already claimed a free ticket for this event"
+          });
+          setIsProcessing(false);
+          return false;
+        }
+      }
+
       let eventData;
       
       if (isValidUuid) {
-        // Get data from Supabase for real events
         const { data: supabaseEventData, error: eventError } = await supabase
           .from('events')
           .select('organizer_wallet, price, currency')
@@ -63,7 +80,6 @@ export const useTicketPurchase = (eventId: string) => {
         if (eventError) throw eventError;
         eventData = supabaseEventData;
       } else {
-        // For mock events or non-UUID IDs
         eventData = {
           organizer_wallet: event.organizer_wallet || "8YUNPvWkKvTajZGEVSmGzh1mTKXzFLCwvKrYLZQ5iT1H",
           price: event.price,
@@ -91,13 +107,11 @@ export const useTicketPurchase = (eventId: string) => {
       let paymentSuccess = false;
       
       if (isFree) {
-        // For free events, no payment processing needed
         paymentSuccess = true;
         toast.success("Free ticket claimed!", {
           description: `You have successfully claimed ${quantity} free ticket${quantity > 1 ? 's' : ''}`
         });
       } else if (paymentMethod === 'SOL') {
-        // For SOL transactions (existing code)
         if (!publicKey) {
           toast.error("Wallet not connected", {
             description: "Please connect your wallet to purchase paid tickets"
@@ -111,33 +125,26 @@ export const useTicketPurchase = (eventId: string) => {
           'confirmed'
         );
 
-        // Convert price to lamports (SOL's smallest unit)
         const lamports = totalPrice * LAMPORTS_PER_SOL;
         
-        // Get latest blockhash
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
 
-        // Create instruction
         const transferInstruction = SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: new PublicKey(eventData.organizer_wallet),
           lamports,
         });
 
-        // Create message with metadata
         const messageV0 = new TransactionMessage({
           payerKey: publicKey,
           recentBlockhash: blockhash,
           instructions: [transferInstruction],
         }).compileToV0Message();
 
-        // Create versioned transaction
         const transaction = new VersionedTransaction(messageV0);
 
-        // Send transaction
         const signature = await sendTransaction(transaction, connection);
         
-        // Wait for confirmation
         const confirmation = await connection.confirmTransaction({
           signature,
           blockhash,
@@ -150,7 +157,6 @@ export const useTicketPurchase = (eventId: string) => {
         
         paymentSuccess = true;
       } else if (paymentMethod === 'TOKEN') {
-        // Placeholder for token transactions
         console.log("Token payment selected - would process token transfer here");
         
         toast.info("Token payment simulation", {
@@ -160,7 +166,6 @@ export const useTicketPurchase = (eventId: string) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         paymentSuccess = true;
       } else if (paymentMethod === 'MONAD') {
-        // For Monad blockchain payments
         const monadWalletAddress = eventData.organizer_monad_wallet || "0x1234567890123456789012345678901234567890";
         
         paymentSuccess = await processMonadPayment(monadWalletAddress, totalPrice);
@@ -189,7 +194,8 @@ export const useTicketPurchase = (eventId: string) => {
           token_id: `${isFree ? 'FREE' : paymentMethod}-TICKET-${ticketId.substring(0, 8)}`,
           ticket_class: ticketClass.toUpperCase(),
           qr_code: qrCode,
-          status: 'upcoming'
+          status: 'upcoming',
+          is_free_ticket: isFree
         };
         
         tickets.push(ticket);
@@ -198,7 +204,6 @@ export const useTicketPurchase = (eventId: string) => {
       console.log('Generated tickets:', tickets);
 
       try {
-        // For free events without wallet, store in localStorage
         if (isFree && !publicKey) {
           const existingLocalTickets = localStorage.getItem('freeTickets');
           let localTickets = [];
@@ -212,7 +217,6 @@ export const useTicketPurchase = (eventId: string) => {
             }
           }
           
-          // Add event data to tickets for localStorage
           const ticketsWithEventData = tickets.map(ticket => ({
             ...ticket,
             events: {
@@ -227,11 +231,9 @@ export const useTicketPurchase = (eventId: string) => {
           console.log('Saved free tickets to localStorage:', localTickets);
         }
         
-        // Only insert to database for valid UUIDs (real events) and when we have a wallet
         if (isValidUuid) {
           console.log('Inserting tickets to database:', tickets);
           
-          // Insert tickets to database
           const { data: insertedTickets, error: ticketError } = await supabase
             .from('tickets')
             .insert(tickets)
@@ -244,7 +246,6 @@ export const useTicketPurchase = (eventId: string) => {
           
           console.log('Successfully inserted tickets:', insertedTickets);
           
-          // Update event sold tickets count
           const { error: updateError } = await supabase
             .from('events')
             .update({ sold_tickets: event.sold_tickets + quantity })
@@ -254,7 +255,6 @@ export const useTicketPurchase = (eventId: string) => {
             console.error('Error updating sold tickets:', updateError);
           }
 
-          // Record the purchase interaction
           if (publicKey) {
             const { error: interactionError } = await supabase
               .from('user_events')
@@ -280,7 +280,6 @@ export const useTicketPurchase = (eventId: string) => {
         return true;
       } catch (dbError) {
         console.error("Database operation failed but payment transaction succeeded:", dbError);
-        // Still return true since the payment transaction was successful
         if (!isFree) {
           toast.success("Purchase successful!", {
             description: `You have purchased ${quantity} ${ticketClass} ticket${quantity > 1 ? 's' : ''}`

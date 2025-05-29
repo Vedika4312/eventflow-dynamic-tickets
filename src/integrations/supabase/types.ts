@@ -9,6 +9,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          scanned_at: string
+          scanned_by: string | null
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          scanned_at?: string
+          scanned_by?: string | null
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          scanned_at?: string
+          scanned_by?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           category: string
@@ -68,6 +106,7 @@ export type Database = {
           created_at: string | null
           event_id: string
           id: string
+          is_free_ticket: boolean | null
           owner_wallet: string
           purchase_currency: string
           purchase_date: string | null
@@ -82,6 +121,7 @@ export type Database = {
           created_at?: string | null
           event_id: string
           id?: string
+          is_free_ticket?: boolean | null
           owner_wallet: string
           purchase_currency?: string
           purchase_date?: string | null
@@ -96,6 +136,7 @@ export type Database = {
           created_at?: string | null
           event_id?: string
           id?: string
+          is_free_ticket?: boolean | null
           owner_wallet?: string
           purchase_currency?: string
           purchase_date?: string | null
@@ -174,6 +215,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_free_ticket_exists: {
+        Args: { user_wallet_addr: string; event_uuid: string }
+        Returns: boolean
+      }
       is_admin: {
         Args: { wallet_address: string }
         Returns: boolean

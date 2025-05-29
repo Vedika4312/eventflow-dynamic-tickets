@@ -10,6 +10,7 @@ import EventsPage from "./pages/EventsPage";
 import EventDetailPage from "./pages/EventDetailPage";
 import MyTicketsPage from "./pages/MyTicketsPage";
 import CreateEventPage from "./pages/CreateEventPage";
+import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/events/:id" element={<EventDetailPage />} />
             <Route path="/my-tickets" element={<MyTicketsPage />} />
             <Route path="/create" element={<CreateEventPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
