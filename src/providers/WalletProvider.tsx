@@ -17,8 +17,12 @@ import { useMemo } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 // Buffer polyfill - make sure this is imported and set BEFORE any wallet adapter code runs
-if (typeof window !== 'undefined') {
-  window.Buffer = window.Buffer || require('buffer').Buffer;
+if (typeof window !== 'undefined' && !window.Buffer) {
+  try {
+    window.Buffer = require('buffer').Buffer;
+  } catch (e) {
+    console.warn('Buffer polyfill failed to load');
+  }
 }
 
 interface WalletProviderProps {
@@ -27,20 +31,34 @@ interface WalletProviderProps {
 
 const WalletProvider = ({ children }: WalletProviderProps) => {
   const network = WalletAdapterNetwork.Devnet;
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  const endpoint = useMemo(() => {
+    try {
+      return clusterApiUrl(network);
+    } catch (error) {
+      console.error('Failed to get cluster API URL:', error);
+      return 'https://api.devnet.solana.com';
+    }
+  }, [network]);
   
   const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new LedgerWalletAdapter(),
-    ],
+    () => {
+      try {
+        return [
+          new PhantomWalletAdapter(),
+          new SolflareWalletAdapter(),
+          new LedgerWalletAdapter(),
+        ];
+      } catch (error) {
+        console.error('Failed to initialize wallets:', error);
+        return [];
+      }
+    },
     []
   );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
+      <SolanaWalletProvider wallets={wallets} autoConnect={false}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>
