@@ -11,36 +11,15 @@ import {
   LedgerWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 
 // Import the CSS using ES module import
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// Setup Buffer polyfill without top-level await
-const setupBufferPolyfill = async () => {
-  if (typeof window !== 'undefined') {
-    if (!window.Buffer) {
-      try {
-        const bufferModule = await import('buffer');
-        window.Buffer = bufferModule.Buffer;
-        console.log('Buffer polyfill loaded successfully');
-      } catch (e) {
-        console.warn('Buffer polyfill failed to load:', e);
-        // Fallback polyfill
-        window.Buffer = {
-          from: (data: any) => new Uint8Array(data),
-          alloc: (size: number) => new Uint8Array(size),
-          isBuffer: () => false,
-        } as any;
-      }
-    }
-    
-    // Ensure global is available for wallet adapters
-    if (!window.global) {
-      window.global = window;
-    }
-  }
-};
+// Buffer polyfill - make sure this is imported and set BEFORE any wallet adapter code runs
+if (typeof window !== 'undefined') {
+  window.Buffer = window.Buffer || require('buffer').Buffer;
+}
 
 interface WalletProviderProps {
   children: React.ReactNode;
@@ -48,37 +27,20 @@ interface WalletProviderProps {
 
 const WalletProvider = ({ children }: WalletProviderProps) => {
   const network = WalletAdapterNetwork.Devnet;
+  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
   
-  // Setup polyfills on component mount
-  useEffect(() => {
-    setupBufferPolyfill();
-  }, []);
-  
-  const endpoint = useMemo(() => {
-    try {
-      return clusterApiUrl(network);
-    } catch (error) {
-      console.error('Failed to get cluster API URL:', error);
-      return 'https://api.devnet.solana.com';
-    }
-  }, [network]);
-  
-  const wallets = useMemo(() => {
-    try {
-      return [
-        new PhantomWalletAdapter(),
-        new SolflareWalletAdapter(),
-        new LedgerWalletAdapter(),
-      ];
-    } catch (error) {
-      console.error('Failed to initialize wallets:', error);
-      return [];
-    }
-  }, []);
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new LedgerWalletAdapter(),
+    ],
+    []
+  );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={wallets} autoConnect={false}>
+      <SolanaWalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>

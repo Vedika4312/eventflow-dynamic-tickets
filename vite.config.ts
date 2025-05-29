@@ -26,7 +26,6 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      buffer: "buffer",
     },
   },
   define: {
@@ -35,19 +34,10 @@ export default defineConfig(({ mode }) => ({
     global: 'globalThis',
   },
   optimizeDeps: {
-    include: ['buffer'],
     esbuildOptions: {
       // Node.js global to browser globalThis
       define: {
         global: 'globalThis',
-      },
-    },
-  },
-  build: {
-    target: 'esnext', // Support modern JavaScript features including top-level await
-    rollupOptions: {
-      output: {
-        format: 'es',
       },
     },
   },
