@@ -2,7 +2,6 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
 import { toast } from "sonner";
 
 export const useWalletIntegration = () => {
@@ -16,17 +15,27 @@ export const useWalletIntegration = () => {
         setIsRegistering(true);
         
         try {
+          console.log('Setting up wallet:', walletAddress);
+          
           // Set the current wallet in Supabase context
-          await supabase.rpc('set_current_wallet', {
+          const { error: rpcError } = await supabase.rpc('set_current_wallet', {
             wallet: walletAddress
           });
           
+          if (rpcError) {
+            console.warn('RPC call failed, continuing without it:', rpcError);
+          }
+          
           // Check if this wallet has interacted before
-          const { data: existingEvents } = await supabase
+          const { data: existingEvents, error: queryError } = await supabase
             .from('user_events')
             .select('id')
             .eq('user_wallet', walletAddress)
             .limit(1);
+          
+          if (queryError) {
+            console.warn('Query failed:', queryError);
+          }
           
           if (!existingEvents || existingEvents.length === 0) {
             // First-time user
@@ -40,20 +49,22 @@ export const useWalletIntegration = () => {
             });
           }
           
-          console.log('Wallet connected and set in Supabase:', walletAddress);
+          console.log('Wallet connected successfully:', walletAddress);
         } catch (error) {
-          console.error('Error setting wallet in Supabase:', error);
+          console.error('Error setting up wallet:', error);
           toast.error("Connection issue", {
-            description: "There was a problem connecting your wallet to our services."
+            description: "Your wallet is connected but there was a problem with our services."
           });
         } finally {
           setIsRegistering(false);
         }
+      } else if (!connected && !connecting) {
+        setIsRegistering(false);
       }
     };
 
     setupWallet();
-  }, [connected, publicKey]);
+  }, [connected, publicKey, connecting]);
 
   const handleDisconnect = async () => {
     try {
@@ -61,6 +72,7 @@ export const useWalletIntegration = () => {
       toast.info("Wallet disconnected");
     } catch (error) {
       console.error("Error disconnecting wallet:", error);
+      toast.error("Error disconnecting wallet");
     }
   };
 

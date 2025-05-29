@@ -16,12 +16,27 @@ import { useMemo } from "react";
 // Import the CSS using ES module import
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-// Buffer polyfill - make sure this is imported and set BEFORE any wallet adapter code runs
-if (typeof window !== 'undefined' && !window.Buffer) {
-  try {
-    window.Buffer = require('buffer').Buffer;
-  } catch (e) {
-    console.warn('Buffer polyfill failed to load');
+// More robust Buffer polyfill setup
+if (typeof window !== 'undefined') {
+  if (!window.Buffer) {
+    try {
+      const { Buffer } = await import('buffer');
+      window.Buffer = Buffer;
+      console.log('Buffer polyfill loaded successfully');
+    } catch (e) {
+      console.warn('Buffer polyfill failed to load:', e);
+      // Fallback polyfill
+      window.Buffer = {
+        from: (data: any) => new Uint8Array(data),
+        alloc: (size: number) => new Uint8Array(size),
+        isBuffer: () => false,
+      } as any;
+    }
+  }
+  
+  // Ensure global is available for wallet adapters
+  if (!window.global) {
+    window.global = window;
   }
 }
 
@@ -31,6 +46,7 @@ interface WalletProviderProps {
 
 const WalletProvider = ({ children }: WalletProviderProps) => {
   const network = WalletAdapterNetwork.Devnet;
+  
   const endpoint = useMemo(() => {
     try {
       return clusterApiUrl(network);
@@ -40,21 +56,18 @@ const WalletProvider = ({ children }: WalletProviderProps) => {
     }
   }, [network]);
   
-  const wallets = useMemo(
-    () => {
-      try {
-        return [
-          new PhantomWalletAdapter(),
-          new SolflareWalletAdapter(),
-          new LedgerWalletAdapter(),
-        ];
-      } catch (error) {
-        console.error('Failed to initialize wallets:', error);
-        return [];
-      }
-    },
-    []
-  );
+  const wallets = useMemo(() => {
+    try {
+      return [
+        new PhantomWalletAdapter(),
+        new SolflareWalletAdapter(),
+        new LedgerWalletAdapter(),
+      ];
+    } catch (error) {
+      console.error('Failed to initialize wallets:', error);
+      return [];
+    }
+  }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
